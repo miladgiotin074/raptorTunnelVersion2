@@ -15,7 +15,8 @@
     "next": "15.4.6",
     "react": "19.1.0",
     "react-apexcharts": "^1.7.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "systeminformation": "^5.27.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

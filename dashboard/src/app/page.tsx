@@ -44,7 +44,7 @@ export default function Home() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/system');
+      const response = await fetch('/api/system-info');
       if (!response.ok) {
         throw new Error('Failed to fetch system information');
       }
