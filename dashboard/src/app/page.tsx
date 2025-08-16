@@ -67,11 +67,11 @@ export default function Home() {
 
   // Use real data or fallback to dummy data
   const cpuUsage = systemInfo?.cpu.usage ?? 45;
-  const ramUsage = systemInfo?.memory.percentage ?? 60;
-  const uptime = systemInfo?.uptime ?? '5 days';
-  const diskSpace = systemInfo?.disk.free ? `${systemInfo.disk.free} GB free` : '120 GB free';
+  const ramUsage = systemInfo?.memory.usage ?? 60;
+  const uptime = systemInfo?.system.uptime ?? '5 days';
+  const diskSpace = systemInfo?.storage.totalSize ? `${systemInfo.storage.totalSize} GB total` : '120 GB total';
   const activeTunnels = systemInfo?.activeTunnels ?? 3;
-  const publicIp = systemInfo?.network.publicIp ?? '192.168.1.100';
+  const publicIp = systemInfo?.network.primaryInterface?.ip ?? '192.168.1.100';
 
   
 

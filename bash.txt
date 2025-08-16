@@ -1,4 +1,3 @@
-sudo ip addr add 5.75.209.235 dev eth0
 #!/bin/bash
 set -e
 
