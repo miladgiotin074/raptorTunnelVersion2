@@ -401,8 +401,11 @@ export default function Home() {
                   <span className="text-cyan-400 font-semibold">TCP/IP</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400 text-sm">Status</span>
-                  <span className="text-green-400 font-semibold">Online</span>
+                  <span className="text-gray-400 text-sm">Location</span>
+                  <div className="flex items-center space-x-1">
+                    <MapPinIcon className="h-4 w-4 text-orange-400" />
+                    <span className="text-orange-400 font-semibold">Iran, Tehran</span>
+                  </div>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
                   <span>Last check: </span>
@@ -411,17 +414,17 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Location */}
+            {/* OS Info */}
             <div className="group/item p-5 bg-gradient-to-r from-gray-700/40 to-gray-800/30 rounded-xl hover:from-blue-500/10 hover:to-indigo-500/10 border border-gray-600/20 hover:border-blue-400/30 transition-all duration-300 hover:scale-105">
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-blue-500/20 rounded-xl group-hover/item:bg-blue-500/30 group-hover/item:scale-110 transition-all duration-300">
-                   <MapPinIcon className="h-6 w-6 text-blue-400 group-hover/item:text-blue-300" />
+                   <ServerIcon className="h-6 w-6 text-blue-400 group-hover/item:text-blue-300" />
                 </div>
                 <div className="text-blue-400 text-xs font-semibold px-2 py-1 bg-blue-500/20 rounded-full">
                   ACTIVE
                 </div>
               </div>
-              <h3 className="text-lg font-semibold text-gray-100 mb-2">Location</h3>
+              <h3 className="text-lg font-semibold text-gray-100 mb-2">OS Info</h3>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">Platform</span>
