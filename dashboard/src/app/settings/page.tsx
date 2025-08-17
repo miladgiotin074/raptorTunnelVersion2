@@ -1,10 +1,12 @@
 'use client';
 
 import { SettingsIcon, UserIcon, ShieldIcon, BellIcon, PaletteIcon, DatabaseIcon, KeyIcon, GlobeIcon, MonitorIcon, WifiIcon, ServerIcon, LockIcon, EyeIcon, EyeOffIcon, SaveIcon, RefreshCwIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Settings() {
-  // Dummy data for settings
+  const [loading, setLoading] = useState(true);
+  
+  // Dummy data for settings - moved before conditional return
   const [settings, setSettings] = useState({
     general: {
       serverName: 'Raptor Server',
@@ -13,24 +15,56 @@ export default function Settings() {
       language: 'English'
     },
     security: {
-      twoFactorAuth: true,
+      enableTwoFactor: false,
       sessionTimeout: 30,
-      passwordExpiry: 90,
-      loginAttempts: 5
+      allowedIPs: '',
+      encryptionLevel: 'AES-256'
     },
     network: {
-      maxConnections: 1000,
-      bandwidth: '1 Gbps',
-      encryption: 'AES-256',
-      protocol: 'TCP/UDP'
+      maxConnections: 100,
+      port: 8080,
+      enableIPv6: true,
+      bandwidth: 1000
     },
     notifications: {
       emailAlerts: true,
       systemAlerts: true,
-      maintenanceMode: false,
-      logLevel: 'INFO'
+      maintenanceMode: false
     }
   });
+
+  useEffect(() => {
+    // Remove artificial loading delay
+    setLoading(false);
+  }, []);
+
+  // Show loading screen for initial load
+  if (loading) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100 flex items-center justify-center relative overflow-hidden">
+        {/* Background animated elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+        </div>
+        
+        <div className="text-center relative z-10">
+          {/* Enhanced loading spinner with settings icon */}
+          <div className="relative mb-8 inline-block">
+            {/* Outer spinning ring only */}
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-transparent border-t-purple-400 border-r-pink-400" style={{animationDuration: '1s'}}></div>
+            {/* Settings icon in center */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <SettingsIcon className="h-8 w-8 text-purple-400 animate-pulse" />
+            </div>
+          </div>
+          
+
+
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100">

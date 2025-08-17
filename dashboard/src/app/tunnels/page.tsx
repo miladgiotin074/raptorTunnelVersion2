@@ -1,8 +1,43 @@
 'use client';
 
 import { WifiIcon, GlobeIcon, ActivityIcon, ServerIcon, TrendingUpIcon, NetworkIcon, ClockIcon, ShieldIcon, ZapIcon, BarChart3Icon, Users2Icon, MapPinIcon, RefreshCwIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export default function Tunnels() {
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Remove artificial loading delay
+    setLoading(false);
+  }, []);
+
+  // Show loading screen for initial load
+  if (loading) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100 flex items-center justify-center relative overflow-hidden">
+        {/* Background animated elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+        </div>
+        
+        <div className="text-center relative z-10">
+          {/* Enhanced loading spinner with tunnel icon */}
+          <div className="relative mb-8 inline-block">
+            {/* Outer spinning ring only */}
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-transparent border-t-blue-400 border-r-cyan-400" style={{animationDuration: '1s'}}></div>
+            {/* Tunnel icon in center */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <WifiIcon className="h-8 w-8 text-blue-400 animate-pulse" />
+            </div>
+          </div>
+          
+
+
+        </div>
+      </div>
+    );
+  }
   // Dummy data for tunnels
   const tunnels = [
     {

@@ -1,7 +1,7 @@
 'use client';
 
 import { RadialChart } from '@/components/DashboardCharts';
-import { CpuIcon, MemoryStickIcon, ClockIcon, HardDriveIcon, NetworkIcon, GlobeIcon, ActivityIcon, ServerIcon, TrendingUpIcon, WifiIcon, MapPinIcon, RefreshCwIcon } from 'lucide-react';
+import { CpuIcon, MemoryStickIcon, ClockIcon, HardDriveIcon, NetworkIcon, GlobeIcon, ActivityIcon, ServerIcon, TrendingUpIcon, WifiIcon, MapPinIcon, RefreshCwIcon, HomeIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface SystemInfo {
@@ -38,6 +38,38 @@ interface SystemInfo {
 export default function Home() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Safe clipboard copy function with fallback
+  const copyToClipboard = async (text: string) => {
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      
+      // Fallback for older browsers or non-secure contexts
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        console.error('Failed to copy text: ', err);
+      } finally {
+        document.body.removeChild(textArea);
+      }
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
+  const [manualLoading, setManualLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Function for automatic refresh (without loading state)
@@ -57,9 +89,13 @@ export default function Home() {
   };
   
   // Function for manual refresh (with loading state)
-  const fetchSystemInfoManual = async () => {
+  const fetchSystemInfoManual = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) {
+        setLoading(true);
+      } else {
+        setManualLoading(true);
+      }
       setError(null);
       const response = await fetch('/api/system-info');
       if (!response.ok) {
@@ -71,16 +107,22 @@ export default function Home() {
       setError(err instanceof Error ? err.message : 'Unknown error occurred');
       console.error('Error fetching system info:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) {
+        setLoading(false);
+      } else {
+        setManualLoading(false);
+      }
     }
   };
   
   useEffect(() => {
     // Initial load with loading state
-    fetchSystemInfoManual();
+    fetchSystemInfoManual(true);
     // Auto refresh every 3 seconds without loading state
     const interval = setInterval(fetchSystemInfoAuto, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, []);
 
   // Use real data or fallback to dummy data
@@ -99,6 +141,35 @@ export default function Home() {
     fetchSystemInfoManual();
   };
 
+  // Show loading screen for initial load
+  if (loading && !systemInfo) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100 flex items-center justify-center relative overflow-hidden">
+        {/* Background animated elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+        </div>
+        
+        <div className="text-center relative z-10">
+          {/* Enhanced loading spinner with icon */}
+          <div className="relative mb-8 inline-block">
+            {/* Outer spinning ring only */}
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-transparent border-t-teal-400 border-r-cyan-400" style={{animationDuration: '1s'}}></div>
+            
+            {/* Center icon */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <HomeIcon className="h-8 w-8 text-teal-300 animate-pulse" />
+            </div>
+          </div>
+          
+
+
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100">
       {/* Header with Refresh Button */}
@@ -111,12 +182,12 @@ export default function Home() {
         </div>
         <button
           onClick={handleRefresh}
-          disabled={loading}
+          disabled={manualLoading}
           className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-teal-500/20 to-cyan-500/20 hover:from-teal-500/30 hover:to-cyan-500/30 border border-teal-400/30 hover:border-teal-400/50 rounded-xl transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
           title="Refresh Dashboard"
         >
-          <RefreshCwIcon className={`h-5 w-5 text-teal-400 group-hover:text-teal-300 transition-all duration-500 ${loading ? 'animate-spin' : 'group-hover:rotate-180'}`} />
-          <span className="text-teal-400 group-hover:text-teal-300 font-medium">{loading ? 'Loading...' : 'Refresh'}</span>
+          <RefreshCwIcon className={`h-5 w-5 text-teal-400 group-hover:text-teal-300 transition-all duration-500 ${manualLoading ? 'animate-spin' : 'group-hover:rotate-180'}`} />
+          <span className="text-teal-400 group-hover:text-teal-300 font-medium">{manualLoading ? 'Loading...' : 'Refresh'}</span>
         </button>
       </div>
       
@@ -295,7 +366,7 @@ export default function Home() {
                   <div className="flex items-center space-x-2">
                     <span className="text-teal-400 font-bold">{publicIp}</span>
                     <button 
-                      onClick={() => navigator.clipboard.writeText(publicIp)}
+                      onClick={() => copyToClipboard(publicIp)}
                       className="p-1 hover:bg-teal-500/20 rounded transition-colors duration-200 group"
                       title="Copy IP Address"
                     >
