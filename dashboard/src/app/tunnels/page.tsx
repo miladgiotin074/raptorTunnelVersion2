@@ -4,7 +4,7 @@ import { WifiIcon, GlobeIcon, ActivityIcon, ServerIcon, TrendingUpIcon, NetworkI
 import { useState, useEffect } from 'react';
 
 export default function Tunnels() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     // Remove artificial loading delay

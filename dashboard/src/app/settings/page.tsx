@@ -4,7 +4,7 @@ import { SettingsIcon, UserIcon, ShieldIcon, BellIcon, PaletteIcon, DatabaseIcon
 import { useState, useEffect } from 'react';
 
 export default function Settings() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   
   // Dummy data for settings - moved before conditional return
   const [settings, setSettings] = useState({
