@@ -35,9 +35,18 @@ interface SystemInfo {
   timestamp: string;
 }
 
+interface LocationInfo {
+  country: string;
+  city: string;
+  region: string;
+  timezone: string;
+}
+
 export default function Home() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [locationInfo, setLocationInfo] = useState<LocationInfo | null>(null);
+  const [locationFetched, setLocationFetched] = useState(false);
 
   // Safe clipboard copy function with fallback
   const copyToClipboard = async (text: string) => {
@@ -115,6 +124,36 @@ export default function Home() {
     }
   };
   
+  // Function to fetch location info based on IP (only once)
+  const fetchLocationInfo = async (ip: string) => {
+    try {
+      // Using ipinfo.io service for IP geolocation (free, reliable)
+      const response = await fetch(`https://ipinfo.io/${ip}/json`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch location information');
+      }
+      const data = await response.json();
+      const [city, region] = (data.city && data.region) ? [data.city, data.region] : ['Unknown', 'Unknown'];
+      setLocationInfo({
+        country: data.country || 'Unknown',
+        city: city,
+        region: region,
+        timezone: data.timezone || 'Unknown'
+      });
+      setLocationFetched(true);
+    } catch (err) {
+      console.error('Error fetching location info:', err);
+      // Fallback to default location
+      setLocationInfo({
+        country: 'Iran',
+        city: 'Tehran',
+        region: 'Tehran Province',
+        timezone: 'Asia/Tehran'
+      });
+      setLocationFetched(true);
+    }
+  };
+  
   useEffect(() => {
     // Initial load with loading state
     fetchSystemInfoManual(true);
@@ -124,6 +163,15 @@ export default function Home() {
       clearInterval(interval);
     };
   }, []);
+
+  // Fetch location only once when systemInfo is available
+  useEffect(() => {
+    if (!locationFetched && systemInfo?.network?.primaryInterface?.ip) {
+      fetchLocationInfo(systemInfo.network.primaryInterface.ip);
+    } else if (!locationFetched && publicIp && publicIp !== '192.168.1.100') {
+      fetchLocationInfo(publicIp);
+    }
+  }, [systemInfo, locationFetched]);
 
   // Use real data or fallback to dummy data
   const cpuUsage = systemInfo?.cpu.usage ?? 45;
@@ -404,7 +452,9 @@ export default function Home() {
                   <span className="text-gray-400 text-sm">Location</span>
                   <div className="flex items-center space-x-1">
                     <MapPinIcon className="h-4 w-4 text-orange-400" />
-                    <span className="text-orange-400 font-semibold">Iran, Tehran</span>
+                    <span className="text-orange-400 font-semibold">
+                      {locationInfo ? `${locationInfo.country}, ${locationInfo.city}` : 'Loading...'}
+                    </span>
                   </div>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
