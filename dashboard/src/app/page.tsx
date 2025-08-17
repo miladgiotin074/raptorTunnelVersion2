@@ -132,6 +132,26 @@ export default function Home() {
   const diskSpace = systemInfo?.storage.totalSize ? `${systemInfo.storage.totalSize} GB total` : '120 GB total';
   const activeTunnels = systemInfo?.activeTunnels ?? 3;
   const publicIp = systemInfo?.network.primaryInterface?.ip ?? '192.168.1.100';
+  
+  // Additional data for Server Info and System Performance
+  const serverLocation = systemInfo?.network.hostname ? 'Server Location' : 'Iran';
+  const serverPlatform = systemInfo?.system.platform ?? 'linux';
+  const serverArch = systemInfo?.system.arch ?? 'x64';
+  const serverHostname = systemInfo?.system.hostname ?? 'localhost';
+  const totalStorage = systemInfo?.storage.totalSize ?? 200;
+  const usedStorage = Math.round((totalStorage * 60) / 100); // 60% usage
+  const freeStorage = totalStorage - usedStorage;
+  const networkDownload = Math.floor(Math.random() * 50) + 100; // Random 100-150 MB/s
+  const networkUpload = Math.floor(Math.random() * 20) + 30; // Random 30-50 MB/s
+  const systemLoad1 = (Math.random() * 0.5 + 1).toFixed(2); // Random 1.0-1.5
+  const systemLoad5 = (Math.random() * 0.5 + 1.2).toFixed(2); // Random 1.2-1.7
+  const systemLoad15 = (Math.random() * 0.5 + 1.4).toFixed(2); // Random 1.4-1.9
+  const runningProcesses = Math.floor(Math.random() * 50) + 120; // Random 120-170
+  const sleepingProcesses = Math.floor(Math.random() * 10) + 1; // Random 1-10
+  const memoryUsed = systemInfo?.memory.used ?? 9.6;
+  const memoryFree = systemInfo?.memory.free ?? 6.4;
+  const memoryCached = Math.round((systemInfo?.memory.total ?? 16) * 0.13); // ~13% cached
+  const memoryBuffers = 0.5; // 512 MB
 
   
 
@@ -404,20 +424,20 @@ export default function Home() {
               <h3 className="text-lg font-semibold text-gray-100 mb-2">Location</h3>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400 text-sm">Country</span>
-                  <span className="text-blue-400 font-bold">{systemInfo?.network.hostname ? 'Server Location' : 'Iran'}</span>
+                  <span className="text-gray-400 text-sm">Platform</span>
+                  <span className="text-blue-400 font-bold">{serverPlatform}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400 text-sm">Region</span>
-                  <span className="text-indigo-400 font-semibold">Middle East</span>
+                  <span className="text-gray-400 text-sm">Architecture</span>
+                  <span className="text-indigo-400 font-semibold">{serverArch}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400 text-sm">Timezone</span>
-                  <span className="text-purple-400 font-semibold">UTC+3:30</span>
+                  <span className="text-gray-400 text-sm">Hostname</span>
+                  <span className="text-purple-400 font-semibold">{serverHostname}</span>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
-                  <span>Latency: </span>
-                  <span className="text-gray-300">12ms average</span>
+                  <span>OS: </span>
+                  <span className="text-gray-300">{systemInfo?.system.distro ?? 'Linux'}</span>
                 </div>
               </div>
             </div>
@@ -436,18 +456,18 @@ export default function Home() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Used</span>
-                  <span className="text-purple-400 font-semibold">120 GB</span>
+                  <span className="text-purple-400 font-semibold">{usedStorage} GB</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Free</span>
-                  <span className="text-green-400 font-semibold">80 GB</span>
+                  <span className="text-green-400 font-semibold">{freeStorage} GB</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Total</span>
-                  <span className="text-blue-400 font-semibold">200 GB</span>
+                  <span className="text-blue-400 font-semibold">{totalStorage} GB</span>
                 </div>
                 <div className="w-full bg-gray-600/50 rounded-full h-2 mt-3">
-                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full w-3/5 transition-all duration-500"></div>
+                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500" style={{width: `${Math.round((usedStorage / totalStorage) * 100)}%`}}></div>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
                   <span>Type: </span>
@@ -531,17 +551,17 @@ export default function Home() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">Download</span>
-                  <span className="text-cyan-400 font-bold">125.4 MB/s</span>
+                  <span className="text-cyan-400 font-bold">{networkDownload} MB/s</span>
                 </div>
                 <div className="w-full bg-gray-600/50 rounded-full h-2">
-                  <div className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full w-3/4 transition-all duration-500"></div>
+                  <div className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full transition-all duration-500" style={{width: `${Math.min(100, (networkDownload / 200) * 100)}%`}}></div>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">Upload</span>
-                  <span className="text-blue-400 font-bold">45.2 MB/s</span>
+                  <span className="text-blue-400 font-bold">{networkUpload} MB/s</span>
                 </div>
                 <div className="w-full bg-gray-600/50 rounded-full h-2">
-                  <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full w-1/2 transition-all duration-500"></div>
+                  <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all duration-500" style={{width: `${Math.min(100, (networkUpload / 100) * 100)}%`}}></div>
                 </div>
               </div>
             </div>
@@ -560,19 +580,19 @@ export default function Home() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">1 min avg</span>
-                  <span className="text-yellow-400 font-bold">1.25</span>
+                  <span className="text-yellow-400 font-bold">{systemLoad1}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">5 min avg</span>
-                  <span className="text-orange-400 font-bold">1.48</span>
+                  <span className="text-orange-400 font-bold">{systemLoad5}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">15 min avg</span>
-                  <span className="text-red-400 font-bold">1.62</span>
+                  <span className="text-red-400 font-bold">{systemLoad15}</span>
                 </div>
                 <div className="mt-3 text-xs text-gray-500">
                   <span>Processes: </span>
-                  <span className="text-gray-300">142 running, 3 sleeping</span>
+                  <span className="text-gray-300">{runningProcesses} running, {sleepingProcesses} sleeping</span>
                 </div>
               </div>
             </div>
@@ -591,22 +611,22 @@ export default function Home() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Used</span>
-                  <span className="text-purple-400 font-semibold">9.6 GB</span>
+                  <span className="text-purple-400 font-semibold">{memoryUsed} GB</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Free</span>
-                  <span className="text-green-400 font-semibold">6.4 GB</span>
+                  <span className="text-green-400 font-semibold">{memoryFree} GB</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Cached</span>
-                  <span className="text-blue-400 font-semibold">2.1 GB</span>
+                  <span className="text-blue-400 font-semibold">{memoryCached} GB</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Buffers</span>
-                  <span className="text-yellow-400 font-semibold">512 MB</span>
+                  <span className="text-yellow-400 font-semibold">{memoryBuffers} GB</span>
                 </div>
                 <div className="w-full bg-gray-600/50 rounded-full h-2 mt-3">
-                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full w-3/5 transition-all duration-500"></div>
+                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500" style={{width: `${ramUsage}%`}}></div>
                 </div>
               </div>
             </div>
@@ -625,21 +645,21 @@ export default function Home() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Root (/)</span>
-                  <span className="text-green-400 font-semibold">45% (120GB free)</span>
+                  <span className="text-green-400 font-semibold">{Math.round((usedStorage / totalStorage) * 100)}% ({freeStorage}GB free)</span>
                 </div>
                 <div className="w-full bg-gray-600/50 rounded-full h-1.5 mb-2">
-                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 h-1.5 rounded-full w-2/5"></div>
+                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 h-1.5 rounded-full transition-all duration-500" style={{width: `${Math.round((usedStorage / totalStorage) * 100)}%`}}></div>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Home (/home)</span>
-                  <span className="text-yellow-400 font-semibold">72% (28GB free)</span>
+                  <span className="text-gray-400">Total Space</span>
+                  <span className="text-blue-400 font-semibold">{totalStorage}GB total</span>
                 </div>
                 <div className="w-full bg-gray-600/50 rounded-full h-1.5 mb-2">
-                  <div className="bg-gradient-to-r from-yellow-500 to-orange-500 h-1.5 rounded-full w-3/4"></div>
+                  <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-1.5 rounded-full w-full"></div>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
-                  <span>I/O: </span>
-                  <span className="text-gray-300">Read 45MB/s, Write 23MB/s</span>
+                  <span>Type: </span>
+                  <span className="text-gray-300">NVMe SSD</span>
                 </div>
               </div>
             </div>
