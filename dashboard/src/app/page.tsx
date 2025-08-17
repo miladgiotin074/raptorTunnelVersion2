@@ -40,7 +40,24 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const fetchSystemInfo = async () => {
+  // Function for automatic refresh (without loading state)
+  const fetchSystemInfoAuto = async () => {
+    try {
+      setError(null);
+      const response = await fetch('/api/system-info');
+      if (!response.ok) {
+        throw new Error('Failed to fetch system information');
+      }
+      const data = await response.json();
+      setSystemInfo(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      console.error('Error fetching system info:', err);
+    }
+  };
+  
+  // Function for manual refresh (with loading state)
+  const fetchSystemInfoManual = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -59,9 +76,10 @@ export default function Home() {
   };
   
   useEffect(() => {
-    fetchSystemInfo();
-    // Refresh data every 30 seconds
-    const interval = setInterval(fetchSystemInfo, 30000);
+    // Initial load with loading state
+    fetchSystemInfoManual();
+    // Auto refresh every 3 seconds without loading state
+    const interval = setInterval(fetchSystemInfoAuto, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -78,7 +96,7 @@ export default function Home() {
   
 
   const handleRefresh = () => {
-    fetchSystemInfo();
+    fetchSystemInfoManual();
   };
 
   return (
