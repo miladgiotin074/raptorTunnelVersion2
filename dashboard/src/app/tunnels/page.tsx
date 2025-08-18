@@ -295,12 +295,14 @@ function TunnelCard({
   
   const generateConnectionCode = () => {
     const connectionData = {
+      type: 'tunnel_config',
       foreign_ip: tunnel.foreign_ip,
       vxlan_port: tunnel.vxlan_port,
       socks_port: tunnel.socks_port,
       vni: tunnel.vni,
       iran_vxlan_ip: tunnel.iran_vxlan_ip,
-      foreign_vxlan_ip: tunnel.foreign_vxlan_ip
+      foreign_vxlan_ip: tunnel.foreign_vxlan_ip,
+      tunnel_name: tunnel.name
     };
     return btoa(JSON.stringify(connectionData));
   };
