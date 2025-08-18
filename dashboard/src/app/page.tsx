@@ -47,13 +47,15 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [locationInfo, setLocationInfo] = useState<LocationInfo | null>(null);
   const [locationFetched, setLocationFetched] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
-  // Safe clipboard copy function with fallback
+  // Safe clipboard copy function with fallback and toast notification
   const copyToClipboard = async (text: string) => {
     try {
       // Try modern clipboard API first
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
+        showToastNotification();
         return;
       }
       
@@ -69,6 +71,7 @@ export default function Home() {
       
       try {
         document.execCommand('copy');
+        showToastNotification();
       } catch (err) {
         console.error('Failed to copy text: ', err);
       } finally {
@@ -77,6 +80,14 @@ export default function Home() {
     } catch (err) {
       console.error('Failed to copy text: ', err);
     }
+  };
+
+  // Show toast notification
+  const showToastNotification = () => {
+    setShowToast(true);
+    setTimeout(() => {
+      setShowToast(false);
+    }, 3000); // Hide after 3 seconds
   };
   const [manualLoading, setManualLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -729,6 +740,23 @@ export default function Home() {
           </div>
         </div>
       </div>
+      
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed top-6 right-6 z-50 transform transition-all duration-500 ease-out animate-pulse">
+          <div className="bg-gradient-to-br from-slate-800/95 via-slate-700/95 to-slate-600/95 backdrop-blur-md text-white px-5 py-4 rounded-2xl shadow-2xl border border-slate-500/30 flex items-center space-x-4 min-w-[280px]">
+            <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-white text-sm tracking-wide">IP Address Copied!</p>
+              <p className="text-slate-300 text-xs mt-0.5">Successfully copied to clipboard</p>
+            </div>
+          </div>
+        </div>
+      )}
       
     </div>
   );
