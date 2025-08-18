@@ -305,10 +305,26 @@ function TunnelCard({
     return btoa(JSON.stringify(connectionData));
   };
   
-  const copyConnectionCode = () => {
-    const code = generateConnectionCode();
-    navigator.clipboard.writeText(code);
-    // You could add a toast notification here
+  const copyConnectionCode = async () => {
+    try {
+      const code = generateConnectionCode();
+      if (typeof window !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(code);
+        // You could add a toast notification here
+        console.log('Connection code copied to clipboard');
+      } else {
+        // Fallback for older browsers or server-side
+        const textArea = document.createElement('textarea');
+        textArea.value = code;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        console.log('Connection code copied to clipboard (fallback)');
+      }
+    } catch (error) {
+      console.error('Failed to copy connection code:', error);
+    }
   };
   
   return (

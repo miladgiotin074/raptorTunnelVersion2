@@ -1,0 +1,2 @@
+sudo ip addr add 95.217.245.60 dev eth0
+dWxjkAxRuwPV
