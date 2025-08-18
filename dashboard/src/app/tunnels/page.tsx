@@ -1,348 +1,911 @@
 'use client';
 
-import { WifiIcon, GlobeIcon, ActivityIcon, ServerIcon, TrendingUpIcon, NetworkIcon, ClockIcon, ShieldIcon, ZapIcon, BarChart3Icon, Users2Icon, MapPinIcon, RefreshCwIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { RefreshCwIcon, WifiIcon, TrendingUpIcon, Users2Icon, BarChart3Icon, GlobeIcon, ClockIcon, ZapIcon, PlusIcon, PlayIcon, Square, RotateCcwIcon, TrashIcon, CopyIcon, SettingsIcon, ServerIcon } from 'lucide-react';
 
-export default function Tunnels() {
+interface Tunnel {
+  id: string;
+  name: string;
+  type: 'foreign' | 'iran';
+  status: 'active' | 'inactive';
+  foreign_ip: string;
+  iran_ip: string;
+  vxlan_port: number;
+  socks_port: number;
+  vni: number;
+  iran_vxlan_ip: string;
+  foreign_vxlan_ip: string;
+  bandwidth_usage: string;
+  connection_count: number;
+  created_at: string;
+  last_active: string;
+}
+
+interface CreateTunnelData {
+  name: string;
+  type: 'foreign' | 'iran';
+  foreign_ip?: string;
+  iran_ip?: string;
+  vxlan_port?: number;
+  socks_port?: number;
+  connection_code?: string;
+  manual_setup?: {
+    vni: number;
+    iran_vxlan_ip: string;
+    foreign_vxlan_ip: string;
+  };
+}
+
+export default function TunnelsPage() {
+  const [tunnels, setTunnels] = useState<Tunnel[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [connectionCode, setConnectionCode] = useState('');
+  const [operationLoading, setOperationLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
+  // Initialize lastUpdate on client side only
   useEffect(() => {
-    // Remove artificial loading delay
-    setLoading(false);
+    setLastUpdate(new Date());
   }, []);
 
-  // Show loading screen for initial load
-  if (loading) {
-    return (
-      <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100 flex items-center justify-center relative overflow-hidden">
-        {/* Background animated elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-        </div>
-        
-        <div className="text-center relative z-10">
-          {/* Enhanced loading spinner with tunnel icon */}
-          <div className="relative mb-8 inline-block">
-            {/* Outer spinning ring only */}
-            <div className="animate-spin rounded-full h-20 w-20 border-4 border-transparent border-t-blue-400 border-r-cyan-400" style={{animationDuration: '1s'}}></div>
-            {/* Tunnel icon in center */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <WifiIcon className="h-8 w-8 text-blue-400 animate-pulse" />
-            </div>
-          </div>
-          
-
-
-        </div>
-      </div>
-    );
-  }
-  // Dummy data for tunnels
-  const tunnels = [
-    {
-      id: 1,
-      name: 'Main Server Tunnel',
-      status: 'active',
-      protocol: 'OpenVPN',
-      location: 'Tehran, Iran',
-      ip: '192.168.1.100',
-      port: 1194,
-      clients: 15,
-      uptime: '12 days',
-      traffic: { up: '2.4 GB', down: '8.7 GB' },
-      bandwidth: '100 Mbps',
-      ping: '12ms'
-    },
-    {
-      id: 2,
-      name: 'Backup Tunnel',
-      status: 'active',
-      protocol: 'WireGuard',
-      location: 'Isfahan, Iran',
-      ip: '192.168.1.101',
-      port: 51820,
-      clients: 8,
-      uptime: '5 days',
-      traffic: { up: '1.2 GB', down: '4.3 GB' },
-      bandwidth: '50 Mbps',
-      ping: '18ms'
-    },
-    {
-      id: 3,
-      name: 'Development Tunnel',
-      status: 'inactive',
-      protocol: 'IKEv2',
-      location: 'Shiraz, Iran',
-      ip: '192.168.1.102',
-      port: 500,
-      clients: 0,
-      uptime: '0 days',
-      traffic: { up: '0 GB', down: '0 GB' },
-      bandwidth: '25 Mbps',
-      ping: 'N/A'
+  // Fetch tunnels from API
+  const fetchTunnels = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/tunnels');
+      if (!response.ok) throw new Error('Failed to fetch tunnels');
+      const data = await response.json();
+      setTunnels(data.tunnels || []);
+      setLastUpdate(new Date());
+      setError(null);
+    } catch (err) {
+      setError('Failed to load tunnels');
+      console.error('Error fetching tunnels:', err);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const totalClients = tunnels.reduce((sum, tunnel) => sum + tunnel.clients, 0);
+  // Auto-refresh every 3 seconds
+  useEffect(() => {
+    fetchTunnels();
+    const interval = setInterval(fetchTunnels, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Handle tunnel operations
+  async function handleTunnelOperation(tunnelId: string, operation: 'start' | 'stop' | 'restart' | 'delete') {
+    try {
+      setOperationLoading(tunnelId);
+      setError(null);
+      
+      const response = await fetch(`/api/tunnels/${tunnelId}/${operation}`, {
+        method: operation === 'delete' ? 'DELETE' : 'POST'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to ${operation} tunnel`);
+      }
+      
+      const data = await response.json();
+      setSuccess(data.message || `Tunnel ${operation}ed successfully`);
+      
+      // Refresh tunnels list
+      await fetchTunnels();
+      
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (err: any) {
+      setError(err.message || `Failed to ${operation} tunnel`);
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setOperationLoading(null);
+    }
+  }
+
+  // Calculate stats
+  const totalConnections = tunnels.reduce((sum, tunnel) => sum + tunnel.connection_count, 0);
   const activeTunnels = tunnels.filter(tunnel => tunnel.status === 'active').length;
-  const totalTrafficUp = tunnels.reduce((sum, tunnel) => sum + parseFloat(tunnel.traffic.up), 0);
-  const totalTrafficDown = tunnels.reduce((sum, tunnel) => sum + parseFloat(tunnel.traffic.down), 0);
+  const iranTunnels = tunnels.filter(tunnel => tunnel.type === 'iran').length;
+  const foreignTunnels = tunnels.filter(tunnel => tunnel.type === 'foreign').length;
 
   const handleRefresh = () => {
-    window.location.reload();
+    fetchTunnels();
   };
 
   return (
-    <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100">
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Tunnels</h1>
-            <p className="text-gray-400 mt-1">Manage and monitor VPN tunnels</p>
-          </div>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">VXLAN Tunnels</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Manage your VXLAN tunnels between Iran and Foreign servers
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Create Tunnel
+          </button>
           <button
             onClick={handleRefresh}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 hover:from-blue-500/30 hover:to-indigo-500/30 border border-blue-400/30 hover:border-blue-400/50 rounded-xl transition-all duration-300 group"
-            title="Refresh Tunnels"
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            <RefreshCwIcon className="h-5 w-5 text-blue-400 group-hover:text-blue-300 group-hover:rotate-180 transition-all duration-500" />
-            <span className="text-blue-400 group-hover:text-blue-300 font-medium">Refresh</span>
+            <RefreshCwIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
           </button>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Active Tunnels */}
-        <div className="relative bg-gradient-to-br from-teal-500/10 via-gray-800/60 to-cyan-500/10 backdrop-blur-sm border border-teal-400/20 p-6 rounded-2xl shadow-2xl hover:shadow-teal-500/20 hover:scale-[1.05] hover:border-teal-400/40 transition-all duration-500 group overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-teal-500/30 to-cyan-500/20 rounded-xl group-hover:from-teal-500/40 group-hover:to-cyan-500/30 group-hover:scale-110 transition-all duration-300">
-                <WifiIcon className="h-7 w-7 text-teal-300 group-hover:text-teal-200" />
-              </div>
-              <div className="flex items-center space-x-2">
-                <TrendingUpIcon className="h-4 w-4 text-green-400 animate-pulse" />
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-ping"></div>
-              </div>
+      {/* Error/Success Messages */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <p className="text-red-800 dark:text-red-200">{error}</p>
+        </div>
+      )}
+      {success && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <p className="text-green-800 dark:text-green-200">{success}</p>
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Tunnels</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{activeTunnels}</p>
             </div>
-            <p className="text-sm text-gray-400 mb-2 font-medium">Active Tunnels</p>
-            <div className="flex items-baseline space-x-2">
-              <p className="text-4xl font-bold bg-gradient-to-r from-teal-300 to-cyan-300 bg-clip-text text-transparent">{activeTunnels}</p>
-              <span className="text-green-400 text-sm font-semibold">of {tunnels.length}</span>
-            </div>
-            <div className="mt-3 flex items-center text-xs text-gray-500">
-              <div className="w-2 h-2 bg-teal-400 rounded-full mr-2"></div>
-              <span>All online</span>
+            <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
+              <WifiIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
           </div>
         </div>
 
-        {/* Total Clients */}
-        <div className="relative bg-gradient-to-br from-blue-500/10 via-gray-800/60 to-indigo-500/10 backdrop-blur-sm border border-blue-400/20 p-6 rounded-2xl shadow-2xl hover:shadow-blue-500/20 hover:scale-[1.05] hover:border-blue-400/40 transition-all duration-500 group overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-blue-500/30 to-indigo-500/20 rounded-xl group-hover:from-blue-500/40 group-hover:to-indigo-500/30 group-hover:scale-110 transition-all duration-300">
-                <Users2Icon className="h-7 w-7 text-blue-300 group-hover:text-blue-200" />
-              </div>
-              <div className="text-xs px-3 py-1.5 rounded-full font-semibold border bg-blue-500/20 text-blue-300 border-blue-400/30 shadow-blue-500/20">
-                LIVE
-              </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Connections</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalConnections}</p>
             </div>
-            <p className="text-sm text-gray-400 mb-2 font-medium">Connected Users</p>
-            <div className="flex items-baseline space-x-2 mb-3">
-              <p className="text-4xl font-bold text-blue-300">{totalClients}</p>
-              <span className="text-gray-500 text-sm">users</span>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Max: 50</span>
-              <span>Avg: 18</span>
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+              <Users2Icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
         </div>
 
-        {/* Upload Traffic */}
-        <div className="relative bg-gradient-to-br from-purple-500/10 via-gray-800/60 to-pink-500/10 backdrop-blur-sm border border-purple-400/20 p-6 rounded-2xl shadow-2xl hover:shadow-purple-500/20 hover:scale-[1.05] hover:border-purple-400/40 transition-all duration-500 group overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-purple-500/30 to-pink-500/20 rounded-xl group-hover:from-purple-500/40 group-hover:to-pink-500/30 group-hover:scale-110 transition-all duration-300">
-                <TrendingUpIcon className="h-7 w-7 text-purple-300 group-hover:text-purple-200" />
-              </div>
-              <div className="text-xs px-3 py-1.5 rounded-full font-semibold border bg-purple-500/20 text-purple-300 border-purple-400/30 shadow-purple-500/20">
-                UP
-              </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Iran Servers</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{iranTunnels}</p>
             </div>
-            <p className="text-sm text-gray-400 mb-2 font-medium">Upload Traffic</p>
-            <div className="flex items-baseline space-x-2 mb-3">
-              <p className="text-4xl font-bold text-purple-300">{totalTrafficUp.toFixed(1)}</p>
-              <span className="text-gray-500 text-sm">GB</span>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Today: 1.2GB</span>
-              <span>Speed: 45MB/s</span>
+            <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+              <ServerIcon className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
         </div>
 
-        {/* Download Traffic */}
-        <div className="relative bg-gradient-to-br from-green-500/10 via-gray-800/60 to-emerald-500/10 backdrop-blur-sm border border-green-400/20 p-6 rounded-2xl shadow-2xl hover:shadow-green-500/20 hover:scale-[1.05] hover:border-green-400/40 transition-all duration-500 group overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-green-500/30 to-emerald-500/20 rounded-xl group-hover:from-green-500/40 group-hover:to-emerald-500/30 group-hover:scale-110 transition-all duration-300">
-                <BarChart3Icon className="h-7 w-7 text-green-300 group-hover:text-green-200" />
-              </div>
-              <div className="text-xs px-3 py-1.5 rounded-full font-semibold border bg-green-500/20 text-green-300 border-green-400/30 shadow-green-500/20">
-                DOWN
-              </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Foreign Servers</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{foreignTunnels}</p>
             </div>
-            <p className="text-sm text-gray-400 mb-2 font-medium">Download Traffic</p>
-            <div className="flex items-baseline space-x-2 mb-3">
-              <p className="text-4xl font-bold text-green-300">{totalTrafficDown.toFixed(1)}</p>
-              <span className="text-gray-500 text-sm">GB</span>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Today: 4.8GB</span>
-              <span>Speed: 125MB/s</span>
+            <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+              <GlobeIcon className="w-6 h-6 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Tunnels List */}
-      <div className="bg-gradient-to-br from-gray-800/60 to-gray-900/40 backdrop-blur-sm border border-gray-600/30 p-8 rounded-2xl shadow-2xl hover:shadow-3xl hover:scale-[1.01] transition-all duration-500">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center">
-            <div className="p-4 bg-gradient-to-br from-indigo-500/30 to-purple-500/20 rounded-2xl mr-5">
-              <ServerIcon className="h-8 w-8 text-indigo-300" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-300 to-purple-300 bg-clip-text text-transparent">Tunnel List</h2>
-              <p className="text-gray-400 mt-1">Manage and control VPN tunnels</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Tunnel List</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Last updated: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Loading...'}
+          </p>
+        </div>
+        
+        {loading && tunnels.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-gray-600 dark:text-gray-400">Loading tunnels...</span>
+          </div>
+        ) : tunnels.length === 0 ? (
+          <div className="text-center py-12">
+            <WifiIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No tunnels found</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">Create your first VXLAN tunnel to get started.</p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Create Tunnel
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {tunnels.map((tunnel) => (
+              <TunnelCard 
+                key={tunnel.id} 
+                tunnel={tunnel} 
+                onOperation={handleTunnelOperation}
+                operationLoading={operationLoading}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {showCreateModal && (
+        <CreateTunnelModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={(message) => {
+            setSuccess(message);
+            fetchTunnels();
+            setTimeout(() => setSuccess(null), 5000);
+          }}
+          onError={(message) => {
+            setError(message);
+            setTimeout(() => setError(null), 5000);
+          }}
+        />
+      )}
+
+      {showConnectionModal && (
+        <ConnectionCodeModal
+          code={connectionCode}
+          onClose={() => {
+            setShowConnectionModal(false);
+            setConnectionCode('');
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Tunnel Card Component
+function TunnelCard({ 
+  tunnel, 
+  onOperation, 
+  operationLoading 
+}: { 
+  tunnel: Tunnel; 
+  onOperation: (id: string, operation: 'start' | 'stop' | 'restart' | 'delete') => void;
+  operationLoading: string | null;
+}) {
+  const [showConnectionCode, setShowConnectionCode] = useState(false);
+  
+  const isLoading = operationLoading === tunnel.id;
+  
+  const generateConnectionCode = () => {
+    const connectionData = {
+      foreign_ip: tunnel.foreign_ip,
+      vxlan_port: tunnel.vxlan_port,
+      socks_port: tunnel.socks_port,
+      vni: tunnel.vni,
+      iran_vxlan_ip: tunnel.iran_vxlan_ip,
+      foreign_vxlan_ip: tunnel.foreign_vxlan_ip
+    };
+    return btoa(JSON.stringify(connectionData));
+  };
+  
+  const copyConnectionCode = () => {
+    const code = generateConnectionCode();
+    navigator.clipboard.writeText(code);
+    // You could add a toast notification here
+  };
+  
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <div className={`p-3 rounded-lg ${
+            tunnel.status === 'active' 
+              ? 'bg-green-100 dark:bg-green-900/20' 
+              : 'bg-gray-100 dark:bg-gray-700'
+          }`}>
+            <ServerIcon className={`w-6 h-6 ${
+              tunnel.status === 'active'
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-gray-400'
+            }`} />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{tunnel.name}</h3>
+            <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                tunnel.type === 'foreign'
+                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+                  : 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
+              }`}>
+                {tunnel.type === 'foreign' ? 'Foreign Server' : 'Iran Server'}
+              </span>
+              <span>•</span>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                tunnel.status === 'active'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                  : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
+              }`}>
+                {tunnel.status === 'active' ? 'Active' : 'Inactive'}
+              </span>
             </div>
           </div>
-          <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
         </div>
+        
+        <div className="flex items-center gap-2">
+          {tunnel.type === 'foreign' && (
+            <button 
+              onClick={copyConnectionCode}
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+              title="Copy Connection Code"
+            >
+              <CopyIcon className="w-4 h-4" />
+            </button>
+          )}
+          
+          {tunnel.status === 'inactive' ? (
+            <button 
+              onClick={() => onOperation(tunnel.id, 'start')}
+              disabled={isLoading}
+              className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors disabled:opacity-50"
+              title="Start Tunnel"
+            >
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <PlayIcon className="w-4 h-4" />
+              )}
+            </button>
+          ) : (
+            <button 
+              onClick={() => onOperation(tunnel.id, 'stop')}
+              disabled={isLoading}
+              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+              title="Stop Tunnel"
+            >
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Square className="w-4 h-4" />
+              )}
+            </button>
+          )}
+          
+          <button 
+            onClick={() => onOperation(tunnel.id, 'restart')}
+            disabled={isLoading}
+            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
+            title="Restart Tunnel"
+          >
+            {isLoading ? (
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <RotateCcwIcon className="w-4 h-4" />
+            )}
+          </button>
+          
+          <button 
+            onClick={() => onOperation(tunnel.id, 'delete')}
+            disabled={isLoading}
+            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+            title="Delete Tunnel"
+          >
+            {isLoading ? (
+              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <TrashIcon className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="flex items-center gap-2">
+          <GlobeIcon className="w-4 h-4 text-gray-400" />
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Foreign IP</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{tunnel.foreign_ip}</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <ServerIcon className="w-4 h-4 text-gray-400" />
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Iran IP</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{tunnel.iran_ip}</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <ZapIcon className="w-4 h-4 text-gray-400" />
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">VXLAN Port</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{tunnel.vxlan_port}</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <SettingsIcon className="w-4 h-4 text-gray-400" />
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">SOCKS Port</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{tunnel.socks_port}</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Users2Icon className="w-4 h-4 text-gray-400" />
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Connections</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{tunnel.connection_count}</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <BarChart3Icon className="w-4 h-4 text-gray-400" />
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Bandwidth</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{tunnel.bandwidth_usage}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div>
+            <p className="text-gray-500 dark:text-gray-400">VNI</p>
+            <p className="font-medium text-gray-900 dark:text-white">{tunnel.vni}</p>
+          </div>
+          <div>
+            <p className="text-gray-500 dark:text-gray-400">Iran VXLAN IP</p>
+            <p className="font-medium text-gray-900 dark:text-white">{tunnel.iran_vxlan_ip}</p>
+          </div>
+          <div>
+            <p className="text-gray-500 dark:text-gray-400">Foreign VXLAN IP</p>
+            <p className="font-medium text-gray-900 dark:text-white">{tunnel.foreign_vxlan_ip}</p>
+          </div>
+          <div>
+            <p className="text-gray-500 dark:text-gray-400">Last Active</p>
+            <p className="font-medium text-gray-900 dark:text-white">
+              {tunnel.last_active ? new Date(tunnel.last_active).toLocaleString() : 'Never'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        <div className="space-y-6">
-          {tunnels.map((tunnel) => (
-            <div key={tunnel.id} className="group/tunnel bg-gradient-to-r from-gray-700/40 to-gray-800/30 rounded-2xl border border-gray-600/20 hover:border-teal-400/30 transition-all duration-300 hover:scale-[1.02] overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-4">
-                    <div className={`p-3 rounded-xl ${
-                      tunnel.status === 'active' 
-                        ? 'bg-green-500/20 group-hover/tunnel:bg-green-500/30' 
-                        : 'bg-red-500/20 group-hover/tunnel:bg-red-500/30'
-                    } group-hover/tunnel:scale-110 transition-all duration-300`}>
-                      <WifiIcon className={`h-6 w-6 ${
-                        tunnel.status === 'active' ? 'text-green-400' : 'text-red-400'
-                      }`} />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-100">{tunnel.name}</h3>
-                      <p className="text-gray-400 text-sm">{tunnel.protocol} • {tunnel.location}</p>
-                    </div>
-                  </div>
-                  <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                    tunnel.status === 'active'
-                      ? 'bg-green-500/20 text-green-300 border-green-400/30'
-                      : 'bg-red-500/20 text-red-300 border-red-400/30'
-                  }`}>
-                    {tunnel.status === 'active' ? 'Active' : 'Inactive'}
+// Create Tunnel Modal Component
+function CreateTunnelModal({ 
+  onClose, 
+  onSuccess, 
+  onError 
+}: { 
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+  onError: (message: string) => void;
+}) {
+  const [step, setStep] = useState<'type' | 'foreign' | 'iran'>('type');
+  const [tunnelType, setTunnelType] = useState<'foreign' | 'iran'>('foreign');
+  const [setupMode, setSetupMode] = useState<'code' | 'manual'>('code');
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    iran_ip: '',
+    foreign_ip: '',
+    vxlan_port: 4789,
+    socks_port: 1080,
+    connection_code: '',
+    vni: 0,
+    iran_vxlan_ip: '',
+    foreign_vxlan_ip: ''
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const payload: CreateTunnelData = {
+        name: formData.name,
+        type: tunnelType
+      };
+      
+      if (tunnelType === 'foreign') {
+        payload.iran_ip = formData.iran_ip;
+        payload.vxlan_port = formData.vxlan_port;
+        payload.socks_port = formData.socks_port;
+      } else {
+        if (setupMode === 'code') {
+          payload.connection_code = formData.connection_code;
+        } else {
+          payload.foreign_ip = formData.foreign_ip;
+          payload.vxlan_port = formData.vxlan_port;
+          payload.manual_setup = {
+            vni: formData.vni,
+            iran_vxlan_ip: formData.iran_vxlan_ip,
+            foreign_vxlan_ip: formData.foreign_vxlan_ip
+          };
+        }
+      }
+      
+      const response = await fetch('/api/tunnels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create tunnel');
+      }
+      
+      const data = await response.json();
+      onSuccess(data.message || 'Tunnel created successfully');
+      onClose();
+    } catch (err: any) {
+      onError(err.message || 'Failed to create tunnel');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Create New Tunnel</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            ×
+          </button>
+        </div>
+        
+        {step === 'type' && (
+          <div className="space-y-4">
+            <p className="text-gray-600 dark:text-gray-400">Select server type:</p>
+            
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setTunnelType('foreign');
+                  setStep('foreign');
+                }}
+                className="w-full p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <GlobeIcon className="w-6 h-6 text-blue-600" />
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-white">Foreign Server</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Create tunnel on foreign server</p>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                  {/* IP Address */}
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <GlobeIcon className="h-4 w-4 text-teal-400" />
-                      <span className="text-gray-400 text-sm">IP Address</span>
-                    </div>
-                    <p className="text-teal-400 font-semibold">{tunnel.ip}</p>
-                    <p className="text-gray-500 text-xs">Port: {tunnel.port}</p>
-                  </div>
-
-                  {/* Clients */}
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Users2Icon className="h-4 w-4 text-blue-400" />
-                      <span className="text-gray-400 text-sm">Clients</span>
-                    </div>
-                    <p className="text-blue-400 font-semibold">{tunnel.clients}</p>
-                    <p className="text-gray-500 text-xs">connected</p>
-                  </div>
-
-                  {/* Uptime */}
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <ClockIcon className="h-4 w-4 text-green-400" />
-                      <span className="text-gray-400 text-sm">Uptime</span>
-                    </div>
-                    <p className="text-green-400 font-semibold">{tunnel.uptime}</p>
-                    <p className="text-gray-500 text-xs">continuous</p>
-                  </div>
-
-                  {/* Traffic Up */}
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <TrendingUpIcon className="h-4 w-4 text-purple-400" />
-                      <span className="text-gray-400 text-sm">Upload</span>
-                    </div>
-                    <p className="text-purple-400 font-semibold">{tunnel.traffic.up}</p>
-                    <p className="text-gray-500 text-xs">total</p>
-                  </div>
-
-                  {/* Traffic Down */}
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <BarChart3Icon className="h-4 w-4 text-cyan-400" />
-                      <span className="text-gray-400 text-sm">Download</span>
-                    </div>
-                    <p className="text-cyan-400 font-semibold">{tunnel.traffic.down}</p>
-                    <p className="text-gray-500 text-xs">total</p>
-                  </div>
-
-                  {/* Bandwidth & Ping */}
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <ZapIcon className="h-4 w-4 text-yellow-400" />
-                      <span className="text-gray-400 text-sm">Performance</span>
-                    </div>
-                    <p className="text-yellow-400 font-semibold">{tunnel.bandwidth}</p>
-                    <p className="text-gray-500 text-xs">Ping: {tunnel.ping}</p>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setTunnelType('iran');
+                  setStep('iran');
+                }}
+                className="w-full p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <ServerIcon className="w-6 h-6 text-purple-600" />
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-white">Iran Server</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Connect to foreign server</p>
                   </div>
                 </div>
-
-                {/* Progress Bar for Traffic */}
-                {tunnel.status === 'active' && (
-                  <div className="mt-6 space-y-3">
-                    <div className="flex justify-between text-xs text-gray-400">
-                      <span>Bandwidth Usage</span>
-                      <span>75% of capacity</span>
-                    </div>
-                    <div className="w-full bg-gray-600/50 rounded-full h-2">
-                      <div className="bg-gradient-to-r from-teal-500 to-cyan-500 h-2 rounded-full w-3/4 transition-all duration-1000"></div>
-                    </div>
-                  </div>
-                )}
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {step === 'foreign' && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Tunnel Name
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Iran Server IP
+              </label>
+              <input
+                type="text"
+                value={formData.iran_ip}
+                onChange={(e) => setFormData({ ...formData, iran_ip: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="1.2.3.4"
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  VXLAN Port
+                </label>
+                <input
+                  type="number"
+                  value={formData.vxlan_port}
+                  onChange={(e) => setFormData({ ...formData, vxlan_port: parseInt(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  min="1"
+                  max="65535"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  SOCKS Port
+                </label>
+                <input
+                  type="number"
+                  value={formData.socks_port}
+                  onChange={(e) => setFormData({ ...formData, socks_port: parseInt(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  min="1"
+                  max="65535"
+                  required
+                />
               </div>
             </div>
-          ))}
-        </div>
-
-        <div className="mt-8 p-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-xl border border-indigo-400/20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse mr-3"></div>
-              <span className="text-green-400 font-semibold">System Status: Healthy & Active</span>
+            
+            <div className="flex gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setStep('type')}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {loading ? 'Creating...' : 'Create Tunnel'}
+              </button>
             </div>
-            <span className="text-gray-400 text-sm">Last updated: 1 minute ago</span>
+          </form>
+        )}
+        
+        {step === 'iran' && (
+          <div className="space-y-4">
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setSetupMode('code')}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  setupMode === 'code'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                }`}
+              >
+                Connection Code
+              </button>
+              <button
+                onClick={() => setSetupMode('manual')}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  setupMode === 'manual'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                }`}
+              >
+                Manual Setup
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Tunnel Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  required
+                />
+              </div>
+              
+              {setupMode === 'code' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Connection Code
+                  </label>
+                  <textarea
+                    value={formData.connection_code}
+                    onChange={(e) => setFormData({ ...formData, connection_code: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    rows={3}
+                    placeholder="Paste connection code from foreign server"
+                    required
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Foreign Server IP
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.foreign_ip}
+                      onChange={(e) => setFormData({ ...formData, foreign_ip: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="1.2.3.4"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      VXLAN Port
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.vxlan_port}
+                      onChange={(e) => setFormData({ ...formData, vxlan_port: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      min="1"
+                      max="65535"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      VNI
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.vni}
+                      onChange={(e) => setFormData({ ...formData, vni: parseInt(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      min="1"
+                      max="16777215"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Iran VXLAN IP
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.iran_vxlan_ip}
+                        onChange={(e) => setFormData({ ...formData, iran_vxlan_ip: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="10.100.1.2"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Foreign VXLAN IP
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.foreign_vxlan_ip}
+                        onChange={(e) => setFormData({ ...formData, foreign_vxlan_ip: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="10.100.1.1"
+                        required
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+              
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setStep('type')}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? 'Creating...' : 'Create Tunnel'}
+                </button>
+              </div>
+            </form>
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Connection Code Modal Component
+function ConnectionCodeModal({ 
+  code, 
+  onClose 
+}: { 
+  code: string;
+  onClose: () => void;
+}) {
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(code);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Connection Code</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            ×
+          </button>
+        </div>
+        
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Copy this code and use it on your Iran server to establish the connection:
+          </p>
+          
+          <div className="relative">
+            <textarea
+              value={code}
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+              rows={4}
+            />
+            <button
+              onClick={copyToClipboard}
+              className="absolute top-2 right-2 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              title="Copy to clipboard"
+            >
+              <CopyIcon className="w-4 h-4" />
+            </button>
+          </div>
+          
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
