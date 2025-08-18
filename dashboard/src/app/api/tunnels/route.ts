@@ -101,6 +101,7 @@ function generateConnectionCode(tunnel: Partial<Tunnel>): string {
   const codeData = {
     type: 'tunnel_config',
     foreign_ip: tunnel.foreign_ip,
+    iran_ip: tunnel.iran_ip,
     vxlan_port: tunnel.vxlan_port,
     vni: tunnel.vni,
     iran_vxlan_ip: tunnel.iran_vxlan_ip,
@@ -177,9 +178,9 @@ export async function POST(request: NextRequest) {
     
     if (type === 'foreign') {
       // Foreign server tunnel creation
-      if (!iran_ip) {
+      if (!iran_ip || !foreign_ip) {
         return NextResponse.json(
-          { error: 'Iran IP is required for foreign server' },
+          { error: 'Iran IP and Foreign IP are required for foreign server' },
           { status: 400 }
         );
       }
@@ -192,7 +193,7 @@ export async function POST(request: NextRequest) {
         name,
         type: 'foreign',
         status: 'inactive',
-        foreign_ip: '', // Will be set when tunnel starts
+        foreign_ip: foreign_ip || '',
         iran_ip,
         vxlan_port,
         socks_port,
@@ -236,7 +237,7 @@ export async function POST(request: NextRequest) {
             type: 'iran',
             status: 'inactive',
             foreign_ip: decodedData.foreign_ip,
-            iran_ip: '', // Will be set when tunnel starts
+            iran_ip: decodedData.iran_ip || '',
             vxlan_port: decodedData.vxlan_port,
             socks_port: decodedData.socks_port,
             vni: decodedData.vni,
@@ -278,7 +279,7 @@ export async function POST(request: NextRequest) {
           type: 'iran',
           status: 'inactive',
           foreign_ip,
-          iran_ip: '', // Will be set when tunnel starts
+          iran_ip: iran_ip || '',
           vxlan_port,
           socks_port,
           vni,

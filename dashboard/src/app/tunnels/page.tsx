@@ -83,7 +83,8 @@ export default function TunnelsPage() {
       setOperationLoading(tunnelId);
       setError(null);
       
-      const response = await fetch(`/api/tunnels/${tunnelId}/${operation}`, {
+      const url = operation === 'delete' ? `/api/tunnels/${tunnelId}` : `/api/tunnels/${tunnelId}/${operation}`;
+      const response = await fetch(url, {
         method: operation === 'delete' ? 'DELETE' : 'POST'
       });
       
@@ -297,6 +298,7 @@ function TunnelCard({
     const connectionData = {
       type: 'tunnel_config',
       foreign_ip: tunnel.foreign_ip,
+      iran_ip: tunnel.iran_ip,
       vxlan_port: tunnel.vxlan_port,
       socks_port: tunnel.socks_port,
       vni: tunnel.vni,
@@ -304,7 +306,7 @@ function TunnelCard({
       foreign_vxlan_ip: tunnel.foreign_vxlan_ip,
       tunnel_name: tunnel.name
     };
-    return btoa(JSON.stringify(connectionData));
+    return Buffer.from(JSON.stringify(connectionData), 'utf8').toString('base64');
   };
   
   const copyConnectionCode = async () => {
@@ -546,6 +548,7 @@ function CreateTunnelModal({
       };
       
       if (tunnelType === 'foreign') {
+        payload.foreign_ip = formData.foreign_ip;
         payload.iran_ip = formData.iran_ip;
         payload.vxlan_port = formData.vxlan_port;
         payload.socks_port = formData.socks_port;
@@ -554,12 +557,12 @@ function CreateTunnelModal({
           payload.connection_code = formData.connection_code;
         } else {
           payload.foreign_ip = formData.foreign_ip;
+          payload.iran_ip = formData.iran_ip;
           payload.vxlan_port = formData.vxlan_port;
-          payload.manual_setup = {
-            vni: formData.vni,
-            iran_vxlan_ip: formData.iran_vxlan_ip,
-            foreign_vxlan_ip: formData.foreign_vxlan_ip
-          };
+          payload.socks_port = formData.socks_port;
+          payload.vni = formData.vni;
+          payload.iran_vxlan_ip = formData.iran_vxlan_ip;
+          payload.foreign_vxlan_ip = formData.foreign_vxlan_ip;
         }
       }
       
@@ -648,6 +651,20 @@ function CreateTunnelModal({
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Foreign Server IP
+              </label>
+              <input
+                type="text"
+                value={formData.foreign_ip}
+                onChange={(e) => setFormData({ ...formData, foreign_ip: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="5.6.7.8"
                 required
               />
             </div>
