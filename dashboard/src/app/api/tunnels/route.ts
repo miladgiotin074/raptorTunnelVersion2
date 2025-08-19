@@ -15,10 +15,11 @@ interface Tunnel {
   vni: number;
   iran_vxlan_ip: string;
   foreign_vxlan_ip: string;
-  bandwidth_usage: string;
+  bandwidth_usage: number;
   connection_count: number;
   created_at: string;
   last_active: string;
+  error_message?: string;
 }
 
 interface TunnelsData {
@@ -106,8 +107,7 @@ function generateConnectionCode(tunnel: Partial<Tunnel>): string {
     vni: tunnel.vni,
     iran_vxlan_ip: tunnel.iran_vxlan_ip,
     foreign_vxlan_ip: tunnel.foreign_vxlan_ip,
-    socks_port: tunnel.socks_port,
-    tunnel_name: tunnel.name
+    socks_port: tunnel.socks_port
   };
   
   return Buffer.from(JSON.stringify(codeData)).toString('base64');
@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
           
           newTunnel = {
             id: crypto.randomUUID(),
-            name: decodedData.tunnel_name || name,
+            name: name,
             type: 'iran',
             status: 'inactive',
             foreign_ip: decodedData.foreign_ip,

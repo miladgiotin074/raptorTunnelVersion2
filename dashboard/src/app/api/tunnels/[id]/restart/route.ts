@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
+import { isLinux, isWindows } from '../../../../../utils/system';
+import { createVXLANInterface, deleteVXLANInterface, setupNATRules, removeNATRules } from '../../../../../utils/vxlan';
+import { startXray, stopXray } from '../../../../../utils/xray';
 
 interface Tunnel {
   id: string;
   name: string;
-  type: 'foreign' | 'iran';
-  status: 'active' | 'inactive';
+  type: 'iran' | 'foreign';
+  status: 'active' | 'inactive' | 'error';
   foreign_ip: string;
   iran_ip: string;
   vxlan_port: number;
@@ -14,10 +17,11 @@ interface Tunnel {
   vni: number;
   iran_vxlan_ip: string;
   foreign_vxlan_ip: string;
-  bandwidth_usage: string;
+  bandwidth_usage: number;
   connection_count: number;
   created_at: string;
   last_active: string;
+  error_message?: string;
 }
 
 interface TunnelsData {
@@ -27,51 +31,138 @@ interface TunnelsData {
 const TUNNELS_FILE = path.join(process.cwd(), 'data', 'tunnels.json');
 
 // Read tunnels from JSON file
-function readTunnels(): TunnelsData {
-  if (!fs.existsSync(TUNNELS_FILE)) {
-    return { tunnels: [] };
-  }
-  
+async function readTunnels(): Promise<TunnelsData> {
   try {
-    const data = fs.readFileSync(TUNNELS_FILE, 'utf8');
+    const data = await fs.readFile(TUNNELS_FILE, 'utf8');
     return JSON.parse(data);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      return { tunnels: [] };
+    }
     console.error('Error reading tunnels file:', error);
     return { tunnels: [] };
   }
 }
 
 // Write tunnels to JSON file
-function writeTunnels(data: TunnelsData): void {
+async function writeTunnels(data: TunnelsData): Promise<void> {
   const dataDir = path.dirname(TUNNELS_FILE);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
   
   try {
-    fs.writeFileSync(TUNNELS_FILE, JSON.stringify(data, null, 2));
+    await fs.mkdir(dataDir, { recursive: true });
+    await fs.writeFile(TUNNELS_FILE, JSON.stringify(data, null, 2));
   } catch (error) {
     console.error('Error writing tunnels file:', error);
-    throw error;
   }
 }
 
-// Mock function to simulate restarting a tunnel
-function restartTunnel(tunnel: Tunnel): Promise<boolean> {
-  return new Promise((resolve) => {
-    // Simulate async operation
-    setTimeout(() => {
-      console.log(`Restarting tunnel: ${tunnel.name} (${tunnel.id})`);
+// Real function to restart tunnel
+async function restartTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?: string }> {
+  // Check if running on supported platform
+  if (isWindows()) {
+    return { success: false, error: 'Tunnel functionality is not supported on Windows. Please run on Ubuntu server.' };
+  }
+  
+  if (!isLinux()) {
+    return { success: false, error: 'Tunnel functionality is only supported on Linux systems.' };
+  }
+
+  try {
+    console.log(`Restarting tunnel ${tunnel.id} (${tunnel.type})`);
+    
+    // Step 1: Stop existing tunnel components
+    console.log('Stopping existing tunnel components...');
+    
+    // Stop Xray process
+    const xrayStopResult = await stopXray(tunnel.socks_port);
+    if (!xrayStopResult.success) {
+      console.warn(`Failed to stop Xray: ${xrayStopResult.error}`);
+    }
+    
+    // Remove NAT rules (for foreign servers)
+    if (tunnel.type === 'foreign') {
+      const natRemoveResult = await removeNATRules(tunnel.foreign_vxlan_ip);
+      if (!natRemoveResult.success) {
+        console.warn(`Failed to remove NAT rules: ${natRemoveResult.error}`);
+      }
+    }
+    
+    // Remove VXLAN interface
+    const vxlanDeleteResult = await deleteVXLANInterface(tunnel.vni);
+    if (!vxlanDeleteResult.success) {
+      console.warn(`Failed to delete VXLAN interface: ${vxlanDeleteResult.error}`);
+    }
+    
+    // Step 2: Wait a moment for cleanup
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Step 3: Start tunnel components again
+    console.log('Starting tunnel components...');
+    
+    if (tunnel.type === 'iran') {
+      // Iran server setup
+      // 1. Create VXLAN interface
+      const vxlanResult = await createVXLANInterface({
+        vni: tunnel.vni,
+        localIP: tunnel.iran_ip,
+        remoteIP: tunnel.foreign_ip,
+        port: tunnel.vxlan_port,
+        vxlanIP: tunnel.iran_vxlan_ip
+      });
       
-      // In real implementation, this would execute:
-      // 1. Stop existing tunnel (if running)
-      // 2. Clean up existing VXLAN interface and processes
-      // 3. Wait a moment for cleanup
-      // 4. Start tunnel again with fresh configuration
+      if (!vxlanResult.success) {
+        return { success: false, error: `VXLAN setup failed: ${vxlanResult.error}` };
+      }
       
-      resolve(true);
-    }, 3000); // Longer timeout for restart operation
-  });
+      // 2. Start Xray SOCKS5 server
+      const xrayResult = await startXray({
+        socksPort: tunnel.socks_port,
+        vxlanIP: tunnel.iran_vxlan_ip,
+        serverType: 'iran'
+      });
+      
+      if (!xrayResult.success) {
+        return { success: false, error: `Xray startup failed: ${xrayResult.error}` };
+      }
+      
+    } else {
+      // Foreign server setup
+      // 1. Create VXLAN interface
+      const vxlanResult = await createVXLANInterface({
+        vni: tunnel.vni,
+        localIP: tunnel.foreign_ip,
+        remoteIP: tunnel.iran_ip,
+        port: tunnel.vxlan_port,
+        vxlanIP: tunnel.foreign_vxlan_ip
+      });
+      
+      if (!vxlanResult.success) {
+        return { success: false, error: `VXLAN setup failed: ${vxlanResult.error}` };
+      }
+      
+      // 2. Setup NAT rules
+      const natResult = await setupNATRules(tunnel.foreign_vxlan_ip);
+      if (!natResult.success) {
+        return { success: false, error: `NAT setup failed: ${natResult.error}` };
+      }
+      
+      // 3. Start Xray SOCKS5 client
+      const xrayResult = await startXray({
+        socksPort: tunnel.socks_port,
+        vxlanIP: tunnel.foreign_vxlan_ip,
+        serverType: 'foreign',
+        remoteVxlanIP: tunnel.iran_vxlan_ip
+      });
+      
+      if (!xrayResult.success) {
+        return { success: false, error: `Xray startup failed: ${xrayResult.error}` };
+      }
+    }
+    
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
 }
 
 // POST - Restart tunnel
@@ -81,7 +172,7 @@ export async function POST(
 ) {
   try {
     const { id } = params;
-    const data = readTunnels();
+    const data = await readTunnels();
     const tunnelIndex = data.tunnels.findIndex(t => t.id === id);
     
     if (tunnelIndex === -1) {
@@ -94,32 +185,38 @@ export async function POST(
     const tunnel = data.tunnels[tunnelIndex];
     
     // Restart the tunnel (works regardless of current status)
-    const success = await restartTunnel(tunnel);
+    const result = await restartTunnel(tunnel);
     
-    if (success) {
+    if (result.success) {
       data.tunnels[tunnelIndex].status = 'active';
       data.tunnels[tunnelIndex].last_active = new Date().toISOString();
+      data.tunnels[tunnelIndex].error_message = undefined;
       
-      // Update with fresh mock stats
-      data.tunnels[tunnelIndex].bandwidth_usage = `${Math.floor(Math.random() * 500) + 50} MB/s`;
-      data.tunnels[tunnelIndex].connection_count = Math.floor(Math.random() * 100) + 1;
+      // Initialize with zero stats (will be updated by monitoring)
+      data.tunnels[tunnelIndex].bandwidth_usage = 0;
+      data.tunnels[tunnelIndex].connection_count = 0;
       
-      writeTunnels(data);
+      await writeTunnels(data);
       
       return NextResponse.json({
         message: 'Tunnel restarted successfully',
         tunnel: data.tunnels[tunnelIndex]
       });
     } else {
+      // Update tunnel status to error
+      data.tunnels[tunnelIndex].status = 'error';
+      data.tunnels[tunnelIndex].error_message = result.error;
+      await writeTunnels(data);
+      
       return NextResponse.json(
-        { error: 'Failed to restart tunnel' },
+        { error: result.error || 'Failed to restart tunnel' },
         { status: 500 }
       );
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error restarting tunnel:', error);
     return NextResponse.json(
-      { error: 'Failed to restart tunnel' },
+      { error: 'Failed to restart tunnel: ' + error.message },
       { status: 500 }
     );
   }

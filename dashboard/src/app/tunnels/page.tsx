@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RefreshCwIcon, WifiIcon, TrendingUpIcon, Users2Icon, BarChart3Icon, GlobeIcon, ClockIcon, ZapIcon, PlusIcon, PlayIcon, Square, RotateCcwIcon, TrashIcon, CopyIcon, SettingsIcon, ServerIcon } from 'lucide-react';
+import { RefreshCwIcon, WifiIcon, TrendingUpIcon, Users2Icon, BarChart3Icon, GlobeIcon, ClockIcon, ZapIcon, PlusIcon, PlayIcon, Square, RotateCcwIcon, TrashIcon, CopyIcon, SettingsIcon, ServerIcon, EditIcon } from 'lucide-react';
 
 interface Tunnel {
   id: string;
   name: string;
-  type: 'foreign' | 'iran';
-  status: 'active' | 'inactive';
+  type: 'iran' | 'foreign';
+  status: 'active' | 'inactive' | 'error';
   foreign_ip: string;
   iran_ip: string;
   vxlan_port: number;
@@ -15,15 +15,16 @@ interface Tunnel {
   vni: number;
   iran_vxlan_ip: string;
   foreign_vxlan_ip: string;
-  bandwidth_usage: string;
+  bandwidth_usage: number;
   connection_count: number;
   created_at: string;
   last_active: string;
+  error_message?: string;
 }
 
 interface CreateTunnelData {
   name: string;
-  type: 'foreign' | 'iran';
+  type: 'iran' | 'foreign';
   foreign_ip?: string;
   iran_ip?: string;
   vxlan_port?: number;
@@ -78,10 +79,17 @@ export default function TunnelsPage() {
   }, []);
 
   // Handle tunnel operations
-  async function handleTunnelOperation(tunnelId: string, operation: 'start' | 'stop' | 'restart' | 'delete') {
+  async function handleTunnelOperation(tunnelId: string, operation: 'start' | 'stop' | 'restart' | 'delete' | 'edit') {
     try {
       setOperationLoading(tunnelId);
       setError(null);
+      
+      if (operation === 'edit') {
+        // For edit operation, we'll show an edit modal (to be implemented)
+        setError('Edit functionality will be implemented soon');
+        setTimeout(() => setError(null), 3000);
+        return;
+      }
       
       const url = operation === 'delete' ? `/api/tunnels/${tunnelId}` : `/api/tunnels/${tunnelId}/${operation}`;
       const response = await fetch(url, {
@@ -239,7 +247,9 @@ export default function TunnelsPage() {
           </div>
         ) : (
           <div className="grid gap-6">
-            {tunnels.map((tunnel) => (
+            {tunnels
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              .map((tunnel) => (
               <TunnelCard 
                 key={tunnel.id} 
                 tunnel={tunnel} 
@@ -303,8 +313,7 @@ function TunnelCard({
       socks_port: tunnel.socks_port,
       vni: tunnel.vni,
       iran_vxlan_ip: tunnel.iran_vxlan_ip,
-      foreign_vxlan_ip: tunnel.foreign_vxlan_ip,
-      tunnel_name: tunnel.name
+      foreign_vxlan_ip: tunnel.foreign_vxlan_ip
     };
     return Buffer.from(JSON.stringify(connectionData), 'utf8').toString('base64');
   };
@@ -360,9 +369,11 @@ function TunnelCard({
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                 tunnel.status === 'active'
                   ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                  : tunnel.status === 'error'
+                  ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
                   : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
               }`}>
-                {tunnel.status === 'active' ? 'Active' : 'Inactive'}
+                {tunnel.status === 'active' ? 'Active' : tunnel.status === 'error' ? 'Error' : 'Inactive'}
               </span>
             </div>
           </div>
@@ -408,6 +419,19 @@ function TunnelCard({
           )}
           
           <button 
+            onClick={() => onOperation(tunnel.id, 'edit')}
+            disabled={isLoading}
+            className="p-2 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors disabled:opacity-50"
+            title="Edit Tunnel"
+          >
+            {isLoading ? (
+              <div className="w-4 h-4 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <EditIcon className="w-4 h-4" />
+            )}
+          </button>
+          
+          <button 
             onClick={() => onOperation(tunnel.id, 'restart')}
             disabled={isLoading}
             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
@@ -437,18 +461,18 @@ function TunnelCard({
       
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <div className="flex items-center gap-2">
-          <GlobeIcon className="w-4 h-4 text-gray-400" />
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Foreign IP</p>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">{tunnel.foreign_ip}</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
           <ServerIcon className="w-4 h-4 text-gray-400" />
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">Iran IP</p>
             <p className="text-sm font-medium text-gray-900 dark:text-white">{tunnel.iran_ip}</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <GlobeIcon className="w-4 h-4 text-gray-400" />
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Foreign IP</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{tunnel.foreign_ip}</p>
           </div>
         </div>
         
@@ -480,7 +504,9 @@ function TunnelCard({
           <BarChart3Icon className="w-4 h-4 text-gray-400" />
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400">Bandwidth</p>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">{tunnel.bandwidth_usage}</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">
+              {tunnel.bandwidth_usage > 0 ? `${tunnel.bandwidth_usage} MB/s` : '0 MB/s'}
+            </p>
           </div>
         </div>
       </div>
@@ -506,6 +532,15 @@ function TunnelCard({
             </p>
           </div>
         </div>
+        
+        {/* Error Message */}
+        {tunnel.status === 'error' && tunnel.error_message && (
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-400">
+              <span className="font-medium">Error:</span> {tunnel.error_message}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -657,20 +692,6 @@ function CreateTunnelModal({
             
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Foreign Server IP
-              </label>
-              <input
-                type="text"
-                value={formData.foreign_ip}
-                onChange={(e) => setFormData({ ...formData, foreign_ip: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="5.6.7.8"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Iran Server IP
               </label>
               <input
@@ -679,6 +700,20 @@ function CreateTunnelModal({
                 onChange={(e) => setFormData({ ...formData, iran_ip: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 placeholder="1.2.3.4"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Foreign Server IP
+              </label>
+              <input
+                type="text"
+                value={formData.foreign_ip}
+                onChange={(e) => setFormData({ ...formData, foreign_ip: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="5.6.7.8"
                 required
               />
             </div>
