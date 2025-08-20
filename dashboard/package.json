@@ -9,13 +9,16 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@types/node-fetch": "^2.6.13",
     "apexcharts": "^5.3.3",
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.539.0",
     "next": "15.4.6",
+    "node-fetch": "^3.3.2",
     "react": "19.1.0",
     "react-apexcharts": "^1.7.0",
     "react-dom": "19.1.0",
+    "socks-proxy-agent": "^8.0.5",
     "systeminformation": "^5.27.7"
   },
   "devDependencies": {
