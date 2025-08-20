@@ -23,11 +23,11 @@ function generateXrayConfig(config: XrayConfig): any {
   };
 
   if (config.serverType === 'iran') {
-    // Iran server configuration - SOCKS5 inbound
+    // Iran server configuration - SOCKS5 inbound for clients
     baseConfig.inbounds.push({
       tag: "socks-in",
       port: config.socksPort,
-      listen: config.vxlanIP,
+      listen: "0.0.0.0", // Listen on all interfaces for client connections
       protocol: "socks",
       settings: {
         auth: "noauth",
@@ -35,43 +35,9 @@ function generateXrayConfig(config: XrayConfig): any {
       }
     });
 
-    // Direct outbound for Iran server
+    // SOCKS5 outbound to foreign server through VXLAN
     baseConfig.outbounds.push({
-      tag: "direct",
-      protocol: "freedom",
-      settings: {}
-    });
-
-    // Route all traffic through direct
-    baseConfig.routing.rules.push({
-      type: "field",
-      inboundTag: ["socks-in"],
-      outboundTag: "direct"
-    });
-  } else {
-    // Foreign server configuration - HTTP/SOCKS5 inbound for local clients
-    baseConfig.inbounds.push({
-      tag: "http-in",
-      port: 8080,
-      listen: "127.0.0.1",
-      protocol: "http",
-      settings: {}
-    });
-
-    baseConfig.inbounds.push({
-      tag: "socks-in",
-      port: 1080,
-      listen: "127.0.0.1",
-      protocol: "socks",
-      settings: {
-        auth: "noauth",
-        udp: true
-      }
-    });
-
-    // SOCKS5 outbound to Iran server through VXLAN
-    baseConfig.outbounds.push({
-      tag: "iran-proxy",
+      tag: "foreign-proxy",
       protocol: "socks",
       settings: {
         servers: [{
@@ -82,26 +48,45 @@ function generateXrayConfig(config: XrayConfig): any {
       }
     });
 
-    // Direct outbound for local traffic
+    // Direct outbound for local traffic (fallback)
     baseConfig.outbounds.push({
       tag: "direct",
       protocol: "freedom",
       settings: {}
     });
 
-    // Routing rules
-    baseConfig.routing.rules.push(
-      {
-        type: "field",
-        ip: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8"],
-        outboundTag: "direct"
-      },
-      {
-        type: "field",
-        inboundTag: ["http-in", "socks-in"],
-        outboundTag: "iran-proxy"
+    // Route all SOCKS5 traffic to foreign server
+    baseConfig.routing.rules.push({
+      type: "field",
+      inboundTag: ["socks-in"],
+      outboundTag: "foreign-proxy"
+    });
+  } else {
+    // Foreign server configuration - SOCKS5 inbound from Iran server
+    baseConfig.inbounds.push({
+      tag: "socks-in",
+      port: config.socksPort,
+      listen: config.vxlanIP, // Listen on VXLAN interface for Iran server
+      protocol: "socks",
+      settings: {
+        auth: "noauth",
+        udp: true
       }
-    );
+    });
+
+    // Direct outbound to internet
+    baseConfig.outbounds.push({
+      tag: "direct",
+      protocol: "freedom",
+      settings: {}
+    });
+
+    // Route all traffic from Iran server to internet
+    baseConfig.routing.rules.push({
+      type: "field",
+      inboundTag: ["socks-in"],
+      outboundTag: "direct"
+    });
   }
 
   return baseConfig;

@@ -121,7 +121,19 @@ async function restartTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?
         return { success: false, error: `VXLAN setup failed: ${vxlanResult.error}` };
       }
       
-      // 2. Setup client-side routing to foreign server
+      // 2. Start Xray SOCKS5 server on Iran server (proxy to foreign server)
+      const xrayResult = await startXray({
+        socksPort: tunnel.socks_port,
+        vxlanIP: tunnel.iran_vxlan_ip,
+        serverType: 'iran',
+        remoteVxlanIP: tunnel.foreign_vxlan_ip
+      });
+      
+      if (!xrayResult.success) {
+        return { success: false, error: `Xray startup failed: ${xrayResult.error}` };
+      }
+      
+      // 3. Setup client-side routing to foreign server
       const routeResult = await setupClientRouting({
         foreignVxlanIP: tunnel.foreign_vxlan_ip,
         socksPort: tunnel.socks_port
