@@ -86,8 +86,8 @@ async function stopTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?: s
       }
     }
     
-    // 3. Remove VXLAN interface
-    const vxlanResult = await deleteVXLANInterface(tunnel.vni);
+    // 3. Remove VXLAN interface with proper cleanup
+    const vxlanResult = await deleteVXLANInterface(tunnel.vni, tunnel.iran_vxlan_ip, tunnel.foreign_vxlan_ip);
     if (!vxlanResult.success) {
       return { success: false, error: `VXLAN cleanup failed: ${vxlanResult.error}` };
     }

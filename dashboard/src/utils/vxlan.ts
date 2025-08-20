@@ -57,8 +57,59 @@ export async function createVXLANInterface(config: VXLANConfig): Promise<{ succe
     }
 
     // Add route for VXLAN network
-    const routeCmd = `ip route add ${config.vxlanIP.split('.').slice(0, 3).join('.')}.0/24 dev ${interfaceName}`;
-    await executeCommand(routeCmd); // Don't fail if route already exists
+    const networkRoute = `${config.vxlanIP.split('.').slice(0, 3).join('.')}.0/24`;
+    const checkNetworkRouteCmd = `ip route show ${networkRoute}`;
+    const networkRouteExists = await executeCommand(checkNetworkRouteCmd);
+    
+    if (networkRouteExists.success && networkRouteExists.output && networkRouteExists.output.trim()) {
+      // Remove existing network route
+      const delNetworkRouteCmd = `ip route del ${networkRoute}`;
+      await executeCommand(delNetworkRouteCmd);
+    }
+    
+    const routeCmd = `ip route add ${networkRoute} dev ${interfaceName}`;
+    await executeCommand(routeCmd); // Add the route
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// Remove VXLAN interface and cleanup routes
+export async function removeVXLANInterface(interfaceName: string, vxlanIP: string, foreignVxlanIP: string): Promise<{ success: boolean; error?: string }> {
+  if (!isLinux()) {
+    return { success: false, error: 'VXLAN interfaces are only supported on Linux systems' };
+  }
+
+  const isRootUser = await isRoot();
+  if (!isRootUser) {
+    return { success: false, error: 'Root privileges required to remove VXLAN interface' };
+  }
+
+  try {
+    // Remove route to foreign VXLAN IP if it exists
+    const foreignRouteCheck = await executeCommand(`ip route show ${foreignVxlanIP}/32`);
+    if (foreignRouteCheck.success && foreignRouteCheck.output.trim()) {
+      await executeCommand(`ip route del ${foreignVxlanIP}/32`);
+    }
+
+    // Remove network route if it exists
+    const vxlanNetwork = vxlanIP.split('.').slice(0, 3).join('.') + '.0/24';
+    const networkRouteCheck = await executeCommand(`ip route show ${vxlanNetwork}`);
+    if (networkRouteCheck.success && networkRouteCheck.output.trim()) {
+      await executeCommand(`ip route del ${vxlanNetwork}`);
+    }
+
+    // Remove VXLAN interface
+    const interfaceCheck = await executeCommand(`ip link show ${interfaceName}`);
+    if (interfaceCheck.success) {
+      await executeCommand(`ip link set ${interfaceName} down`);
+      await executeCommand(`ip link del ${interfaceName}`);
+    }
+
+    // Remove NAT rules
+    await removeNATRules(vxlanIP);
 
     return { success: true };
   } catch (error: any) {
@@ -78,6 +129,20 @@ export async function setupClientRouting(config: { foreignVxlanIP: string; socks
   }
 
   try {
+    // Check if route already exists
+    const checkRouteCmd = `ip route show ${config.foreignVxlanIP}/32`;
+    const routeExists = await executeCommand(checkRouteCmd);
+    
+    if (routeExists.success && routeExists.output && routeExists.output.trim()) {
+      // Remove existing route
+      const delRouteCmd = `ip route del ${config.foreignVxlanIP}/32`;
+      const delResult = await executeCommand(delRouteCmd);
+      
+      if (!delResult.success) {
+        console.warn(`Warning: Could not remove existing route: ${delResult.error}`);
+      }
+    }
+
     // Setup route to foreign SOCKS5 server through VXLAN
     const routeCmd = `ip route add ${config.foreignVxlanIP}/32 dev $(ip route | grep 'vxlan.*scope link' | head -1 | awk '{print $3}')`;
     const routeResult = await executeCommand(routeCmd);
@@ -101,8 +166,8 @@ export async function setupClientRouting(config: { foreignVxlanIP: string; socks
   }
 }
 
-// Delete VXLAN interface
-export async function deleteVXLANInterface(vni: number): Promise<{ success: boolean; error?: string }> {
+// Delete VXLAN interface (enhanced with route cleanup)
+export async function deleteVXLANInterface(vni: number, vxlanIP?: string, foreignVxlanIP?: string): Promise<{ success: boolean; error?: string }> {
   if (!isLinux()) {
     return { success: false, error: 'VXLAN is only supported on Linux systems' };
   }
@@ -119,6 +184,25 @@ export async function deleteVXLANInterface(vni: number): Promise<{ success: bool
     const exists = await vxlanInterfaceExists(vni);
     if (!exists) {
       return { success: true }; // Already deleted
+    }
+
+    // If we have IP information, use the comprehensive cleanup function
+    if (vxlanIP && foreignVxlanIP) {
+      return await removeVXLANInterface(interfaceName, vxlanIP, foreignVxlanIP);
+    }
+
+    // Fallback: basic cleanup without IP information
+    // Try to get IP information from the interface
+    const ipResult = await executeCommand(`ip addr show ${interfaceName} | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1`);
+    if (ipResult.success && ipResult.output.trim()) {
+      const currentVxlanIP = ipResult.output.trim();
+      
+      // Remove any routes that might exist for this interface
+      const vxlanNetwork = currentVxlanIP.split('.').slice(0, 3).join('.') + '.0/24';
+      const networkRouteCheck = await executeCommand(`ip route show ${vxlanNetwork}`);
+      if (networkRouteCheck.success && networkRouteCheck.output.trim()) {
+        await executeCommand(`ip route del ${vxlanNetwork}`);
+      }
     }
 
     // Delete VXLAN interface
