@@ -23,14 +23,34 @@ interface SystemInfo {
     free: number;
     percentage: number;
   };
-  uptime: string;
   network: {
-    publicIp: string;
-    localIp: string;
     hostname: string;
-    platform: string;
-    arch: string;
+    interfaces: number;
+    primaryInterface: {
+      name: string;
+      ip: string;
+      mac: string;
+      speed: number;
+    };
   };
+  system: {
+    platform: string;
+    distro: string;
+    release: string;
+    arch: string;
+    hostname: string;
+    uptime: string;
+    uptimeSeconds: number;
+  };
+  storage: {
+    totalSize: number;
+    disks: number;
+  };
+  manufacturer: string;
+  model: string;
+  version: string;
+  publicIp: string;
+  localIp: string;
   activeTunnels: number;
   timestamp: string;
 }
@@ -186,7 +206,7 @@ export default function Home() {
 
   // Use real data or fallback to dummy data
   const cpuUsage = systemInfo?.cpu.usage ?? 45;
-  const ramUsage = systemInfo?.memory.usage ?? 60;
+  const ramUsage = systemInfo?.memory.percentage ?? 60;
   const uptime = systemInfo?.system.uptime ?? '5 days';
   const diskSpace = systemInfo?.storage.totalSize ? `${systemInfo.storage.totalSize} GB total` : '120 GB total';
   const activeTunnels = systemInfo?.activeTunnels ?? 3;

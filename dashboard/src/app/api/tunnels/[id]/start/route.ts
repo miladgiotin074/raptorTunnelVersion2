@@ -150,10 +150,10 @@ async function startTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?: 
 // POST - Start tunnel
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const data = await readTunnels();
     const tunnelIndex = data.tunnels.findIndex(t => t.id === id);
     

@@ -14,7 +14,7 @@ interface Tunnel {
   vni: number;
   iran_vxlan_ip: string;
   foreign_vxlan_ip: string;
-  bandwidth_usage: string;
+  bandwidth_usage: number;
   connection_count: number;
   created_at: string;
   last_active: string;
@@ -71,10 +71,10 @@ function simulateTunnelOperation(operation: string, tunnel: Tunnel): Promise<boo
 // GET - Get specific tunnel
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const data = readTunnels();
     const tunnel = data.tunnels.find(t => t.id === id);
     
@@ -98,10 +98,10 @@ export async function GET(
 // PUT - Update specific tunnel
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     
     const data = readTunnels();
@@ -135,10 +135,10 @@ export async function PUT(
 // DELETE - Delete specific tunnel
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const data = readTunnels();
     const tunnelIndex = data.tunnels.findIndex(t => t.id === id);
     

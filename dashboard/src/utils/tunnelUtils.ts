@@ -1,7 +1,7 @@
 // Utility functions for tunnel management
 
 /**
- * Generate a unique VNI (VXLAN Network Identifier)
+ * Generate a unique VNI (Virtual Network Identifier)
  * VNI should be between 1 and 16777215 (24-bit)
  */
 export function generateVNI(): number {
@@ -10,7 +10,7 @@ export function generateVNI(): number {
 }
 
 /**
- * Generate VXLAN IP addresses for Iran and Foreign servers
+ * Generate network IP addresses for Iran and Foreign servers
  * Uses 10.100.x.x subnet with /30 networks
  */
 export function generateVXLANIPs(vni: number): {
@@ -121,7 +121,7 @@ export function isValidPort(port: number): boolean {
 }
 
 /**
- * Validate VNI (VXLAN Network Identifier)
+ * Validate VNI (Virtual Network Identifier)
  */
 export function isValidVNI(vni: number): boolean {
   return vni >= 1 && vni <= 16777215;

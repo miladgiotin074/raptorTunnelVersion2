@@ -29,6 +29,9 @@ interface CreateTunnelData {
   iran_ip?: string;
   vxlan_port?: number;
   socks_port?: number;
+  vni?: number;
+  iran_vxlan_ip?: string;
+  foreign_vxlan_ip?: string;
   connection_code?: string;
   manual_setup?: {
     vni: number;
@@ -187,10 +190,10 @@ export default function TunnelsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text text-transparent mb-2">
-            VXLAN Tunnels
+            Secure Tunnels
           </h1>
           <p className="text-gray-400">
-            Manage your VXLAN tunnels between Iran and Foreign servers
+            Manage your secure tunnels between Iran and Foreign servers
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -349,7 +352,7 @@ export default function TunnelsPage() {
               <WifiIcon className="w-10 h-10 text-blue-400" />
             </div>
             <h3 className="text-lg font-medium text-gray-100 mb-2">No tunnels found</h3>
-            <p className="text-gray-400 mb-6">Create your first VXLAN tunnel to get started.</p>
+            <p className="text-gray-400 mb-6">Create your first secure tunnel to get started.</p>
             <button
               onClick={() => setShowCreateModal(true)}
               className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 border border-blue-400/30 hover:border-blue-400/50 rounded-xl transition-all duration-300 text-blue-400 hover:text-blue-300"
@@ -529,7 +532,7 @@ function EditTunnelModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">VXLAN Port</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Network Port</label>
               <input
                 type="number"
                 value={formData.vxlan_port}
@@ -765,7 +768,7 @@ function TunnelCard({
         <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-gray-800/30 to-gray-700/30 rounded-xl border border-gray-600/20 hover:border-gray-500/30 hover:scale-105 hover:shadow-lg transition-all duration-300 group/card">
           <ZapIcon className="w-4 h-4 text-yellow-400 group-hover/card:scale-110 group-hover/card:rotate-12 transition-all duration-300" />
           <div>
-            <p className="text-xs text-gray-400">VXLAN Port</p>
+            <p className="text-xs text-gray-400">Network Port</p>
             <p className="text-sm font-medium text-gray-100">{tunnel.vxlan_port}</p>
           </div>
         </div>
@@ -804,11 +807,11 @@ function TunnelCard({
             <p className="font-medium text-gray-100">{tunnel.vni}</p>
           </div>
           <div className="p-3 bg-gradient-to-br from-gray-800/20 to-gray-700/20 rounded-xl border border-gray-600/20">
-            <p className="text-gray-400 text-xs mb-1">Iran VXLAN IP</p>
+            <p className="text-gray-400 text-xs mb-1">Iran Network IP</p>
             <p className="font-medium text-gray-100">{tunnel.iran_vxlan_ip}</p>
           </div>
           <div className="p-3 bg-gradient-to-br from-gray-800/20 to-gray-700/20 rounded-xl border border-gray-600/20">
-            <p className="text-gray-400 text-xs mb-1">Foreign VXLAN IP</p>
+            <p className="text-gray-400 text-xs mb-1">Foreign Network IP</p>
             <p className="font-medium text-gray-100">{tunnel.foreign_vxlan_ip}</p>
           </div>
           <div className="p-3 bg-gradient-to-br from-gray-800/20 to-gray-700/20 rounded-xl border border-gray-600/20">
@@ -1019,14 +1022,14 @@ function CreateTunnelModal({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-200 mb-3">
-                    VXLAN Port
+                    Network Port
                   </label>
                   <input
                     type="number"
                     value={formData.vxlan_port}
                     onChange={(e) => setFormData({ ...formData, vxlan_port: parseInt(e.target.value) })}
                     className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 text-gray-100 placeholder-gray-400 transition-all duration-300"
-                    placeholder="VXLAN port"
+                    placeholder="Network port"
                     min="1"
                     max="65535"
                     required
@@ -1152,14 +1155,14 @@ function CreateTunnelModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-200 mb-3">
-                        VXLAN Port
+                        Network Port
                       </label>
                       <input
                         type="number"
                         value={formData.vxlan_port}
                         onChange={(e) => setFormData({ ...formData, vxlan_port: parseInt(e.target.value) })}
                         className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50 text-gray-100 placeholder-gray-400 transition-all duration-300"
-                        placeholder="VXLAN port"
+                        placeholder="Network port"
                         min="1"
                         max="65535"
                         required
@@ -1186,7 +1189,7 @@ function CreateTunnelModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-200 mb-3">
-                        Iran VXLAN IP
+                        Iran Network IP
                       </label>
                       <input
                         type="text"
@@ -1200,7 +1203,7 @@ function CreateTunnelModal({
                     
                     <div>
                       <label className="block text-sm font-semibold text-gray-200 mb-3">
-                        Foreign VXLAN IP
+                        Foreign Network IP
                       </label>
                       <input
                         type="text"

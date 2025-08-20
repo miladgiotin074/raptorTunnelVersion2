@@ -5,10 +5,10 @@ import path from 'path';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const tunnelId = params.id;
+    const { id: tunnelId } = await params;
     
     // Get tunnel information from your database/storage
     // This is a mock implementation - replace with your actual data source
@@ -42,10 +42,14 @@ export async function POST(
     try {
       // Test connection by making a request through the SOCKS5 proxy
       // Using a reliable test endpoint
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const testResponse = await fetch('http://httpbin.org/ip', {
-        agent,
-        timeout: 10000, // 10 second timeout
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       if (testResponse.ok) {
         const data = await testResponse.json();

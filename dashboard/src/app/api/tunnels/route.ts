@@ -72,12 +72,12 @@ function generateVNI(existingTunnels: Tunnel[]): number {
   const usedVNIs = existingTunnels.map(t => t.vni);
   let vni;
   do {
-    vni = Math.floor(Math.random() * 16777215) + 1; // VXLAN VNI range: 1-16777215
+    vni = Math.floor(Math.random() * 16777215) + 1; // VNI range: 1-16777215
   } while (usedVNIs.includes(vni));
   return vni;
 }
 
-// Generate VXLAN IP pair
+// Generate network IP pair
 function generateVXLANIPs(existingTunnels: Tunnel[]): { iran_vxlan_ip: string; foreign_vxlan_ip: string } {
   const usedSubnets = existingTunnels.map(t => {
     const iranIP = t.iran_vxlan_ip.split('.').slice(0, 3).join('.');
@@ -114,12 +114,12 @@ function generateConnectionCode(tunnel: Partial<Tunnel>): string {
 }
 
 // Mock bandwidth and connection data
-function getMockStats(): { bandwidth_usage: string; connection_count: number } {
+function getMockStats(): { bandwidth_usage: number; connection_count: number } {
   const bandwidth = Math.floor(Math.random() * 200) + 50; // 50-250 MB/s
   const connections = Math.floor(Math.random() * 50) + 5; // 5-55 connections
   
   return {
-    bandwidth_usage: `${bandwidth} MB/s`,
+    bandwidth_usage: bandwidth,
     connection_count: connections
   };
 }
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
         vni,
         iran_vxlan_ip: vxlanIPs.iran_vxlan_ip,
         foreign_vxlan_ip: vxlanIPs.foreign_vxlan_ip,
-        bandwidth_usage: '0 MB/s',
+        bandwidth_usage: 0,
         connection_count: 0,
         created_at: new Date().toISOString(),
         last_active: new Date().toISOString()
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
             vni: decodedData.vni,
             iran_vxlan_ip: decodedData.iran_vxlan_ip,
             foreign_vxlan_ip: decodedData.foreign_vxlan_ip,
-            bandwidth_usage: '0 MB/s',
+            bandwidth_usage: 0,
             connection_count: 0,
             created_at: new Date().toISOString(),
             last_active: new Date().toISOString()
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
         // Manual creation
         if (!foreign_ip || !vxlan_port || !socks_port) {
           return NextResponse.json(
-            { error: 'Foreign IP, VXLAN port, and SOCKS port are required for manual setup' },
+            { error: 'Foreign IP, network port, and SOCKS port are required for manual setup' },
             { status: 400 }
           );
         }
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
         
         if (!vni || !iran_vxlan_ip || !foreign_vxlan_ip) {
           return NextResponse.json(
-            { error: 'VNI and VXLAN IPs are required for manual setup' },
+            { error: 'VNI and network IPs are required for manual setup' },
             { status: 400 }
           );
         }
@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
           vni,
           iran_vxlan_ip,
           foreign_vxlan_ip,
-          bandwidth_usage: '0 MB/s',
+          bandwidth_usage: 0,
           connection_count: 0,
           created_at: new Date().toISOString(),
           last_active: new Date().toISOString()

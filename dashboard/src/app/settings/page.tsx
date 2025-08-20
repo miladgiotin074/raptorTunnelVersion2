@@ -18,7 +18,8 @@ export default function Settings() {
       enableTwoFactor: false,
       sessionTimeout: 30,
       allowedIPs: '',
-      encryptionLevel: 'AES-256'
+      encryptionLevel: 'AES-256',
+      loginAttempts: 5
     },
     network: {
       maxConnections: 100,
@@ -158,12 +159,12 @@ export default function Settings() {
                 <div className="relative">
                   <input 
                     type="checkbox" 
-                    checked={settings.security.twoFactorAuth}
-                    onChange={(e) => setSettings({...settings, security: {...settings.security, twoFactorAuth: e.target.checked}})}
+                    checked={settings.security.enableTwoFactor}
+                    onChange={(e) => setSettings({...settings, security: {...settings.security, enableTwoFactor: e.target.checked}})}
                     className="sr-only"
                   />
-                  <div className={`w-12 h-6 rounded-full transition-all duration-300 ${settings.security.twoFactorAuth ? 'bg-green-500' : 'bg-gray-600'}`}>
-                    <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${settings.security.twoFactorAuth ? 'translate-x-6' : 'translate-x-0.5'} translate-y-0.5`}></div>
+                  <div className={`w-12 h-6 rounded-full transition-all duration-300 ${settings.security.enableTwoFactor ? 'bg-green-500' : 'bg-gray-600'}`}>
+                    <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${settings.security.enableTwoFactor ? 'translate-x-6' : 'translate-x-0.5'} translate-y-0.5`}></div>
                   </div>
                 </div>
               </div>

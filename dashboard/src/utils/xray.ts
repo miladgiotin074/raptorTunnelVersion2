@@ -15,10 +15,10 @@ function generateXrayConfig(config: XrayConfig): any {
     log: {
       loglevel: "info"
     },
-    inbounds: [],
-    outbounds: [],
+    inbounds: [] as any[],
+    outbounds: [] as any[],
     routing: {
-      rules: []
+      rules: [] as any[]
     }
   };
 

@@ -59,7 +59,7 @@ export default function Sidebar() {
               }`}>Tunnels</span>
             </Link>
           </li>
-          <li>
+          <li className="hidden">
             <Link href="/settings" className={`group flex items-center py-4 px-4 rounded-xl border transition-all duration-300 hover:scale-105 hover:shadow-lg ${
               pathname === '/settings' 
                 ? 'bg-purple-500/20 border-purple-500/50 text-purple-400' 
