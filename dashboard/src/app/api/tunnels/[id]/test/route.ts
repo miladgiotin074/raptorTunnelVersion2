@@ -35,36 +35,78 @@ export async function POST(
       );
     }
     
-    // Test SOCKS5 connection
-    const socksProxy = `socks5://${tunnel.iran_ip}:${tunnel.socks_port}`;
+    // Test SOCKS5 connection through VXLAN tunnel
+    // Use iran_vxlan_ip instead of iran_ip to test the actual VXLAN connection
+    const socksProxy = `socks5://${tunnel.iran_vxlan_ip}:${tunnel.socks_port}`;
     const agent = new SocksProxyAgent(socksProxy);
     
+    const startTime = Date.now();
+    
     try {
-      // Test connection by making a request through the SOCKS5 proxy
-      // Using a reliable test endpoint
+      // Test connection by making a request through the SOCKS5 proxy via VXLAN
+      // This will verify that:
+      // 1. VXLAN tunnel is established and working
+      // 2. SOCKS5 proxy is accessible through VXLAN
+      // 3. Traffic can flow from Iran server through VXLAN to foreign server
       const testResponse = await fetch('http://httpbin.org/ip', {
         agent,
-        timeout: 10000, // 10 second timeout
+        timeout: 15000, // 15 second timeout for VXLAN connection
       });
+      
+      const responseTime = Date.now() - startTime;
       
       if (testResponse.ok) {
         const data = await testResponse.json();
+        
+        // Verify that the response comes from foreign server IP
+        const isFromForeignServer = data.origin === tunnel.foreign_ip;
+        
         return NextResponse.json({
           success: true,
-          message: 'Connection test successful',
+          message: isFromForeignServer 
+            ? 'VXLAN tunnel and SOCKS5 connection test successful' 
+            : 'SOCKS5 connection successful but traffic may not be routing through foreign server',
           details: {
             proxy_ip: data.origin,
-            response_time: Date.now()
+            expected_foreign_ip: tunnel.foreign_ip,
+            vxlan_working: isFromForeignServer,
+            response_time_ms: responseTime,
+            tested_via: `${tunnel.iran_vxlan_ip}:${tunnel.socks_port}`
           }
         });
       } else {
-        throw new Error(`HTTP ${testResponse.status}`);
+        throw new Error(`HTTP ${testResponse.status}: ${testResponse.statusText}`);
       }
     } catch (proxyError: any) {
+      const responseTime = Date.now() - startTime;
+      
+      // Provide more detailed error information
+      let errorMessage = 'VXLAN tunnel or SOCKS5 connection failed';
+      let errorDetails = proxyError.message;
+      
+      if (proxyError.code === 'ECONNREFUSED') {
+        errorMessage = 'SOCKS5 proxy not accessible via VXLAN - check if tunnel is properly established';
+      } else if (proxyError.code === 'ETIMEDOUT') {
+        errorMessage = 'Connection timeout - VXLAN tunnel may be down or slow';
+      } else if (proxyError.code === 'ENOTFOUND') {
+        errorMessage = 'Cannot resolve VXLAN IP - check network configuration';
+      }
+      
       return NextResponse.json({
         success: false,
-        message: `SOCKS5 connection failed: ${proxyError.message}`,
-        error_type: 'proxy_error'
+        message: errorMessage,
+        error_type: 'vxlan_proxy_error',
+        details: {
+          error_code: proxyError.code,
+          error_details: errorDetails,
+          response_time_ms: responseTime,
+          tested_via: `${tunnel.iran_vxlan_ip}:${tunnel.socks_port}`,
+          troubleshooting: {
+            check_vxlan: 'Verify VXLAN tunnel is established between servers',
+            check_socks: 'Ensure SOCKS5 proxy is running on foreign server',
+            check_routing: 'Verify routing rules for VXLAN traffic'
+          }
+        }
       });
     }
     
