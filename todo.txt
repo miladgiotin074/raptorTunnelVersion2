@@ -1,2 +1,9 @@
 sudo ip addr add 95.217.245.60 dev eth0
 dWxjkAxRuwPV
+ipinfo
+edit
+remove vxlan key
+test connectun
+over
+mobile
+errors
