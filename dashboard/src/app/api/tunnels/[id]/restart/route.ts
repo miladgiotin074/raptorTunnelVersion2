@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
-import { isLinux, isWindows } from '../../../../../utils/system';
-import { createVXLANInterface, deleteVXLANInterface, setupNATRules, removeNATRules } from '../../../../../utils/vxlan';
+import { isLinux, isWindows, executeCommand } from '../../../../../utils/system';
+import { createVXLANInterface, setupNATRules, deleteVXLANInterface, removeNATRules, setupClientRouting } from '../../../../../utils/vxlan';
 import { startXray, stopXray } from '../../../../../utils/xray';
 
 interface Tunnel {
@@ -79,11 +79,18 @@ async function restartTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?
       console.warn(`Failed to stop Xray: ${xrayStopResult.error}`);
     }
     
-    // Remove NAT rules (for foreign servers)
+    // Remove NAT rules (for foreign servers) or client routes (for iran servers)
     if (tunnel.type === 'foreign') {
       const natRemoveResult = await removeNATRules(tunnel.foreign_vxlan_ip);
       if (!natRemoveResult.success) {
         console.warn(`Failed to remove NAT rules: ${natRemoveResult.error}`);
+      }
+    } else {
+      // Remove client routes for Iran servers
+      const routeRemoveCmd = `ip route del ${tunnel.foreign_vxlan_ip}/32`;
+      const routeRemoveResult = await executeCommand(routeRemoveCmd);
+      if (!routeRemoveResult.success) {
+        console.warn(`Failed to remove client route: ${routeRemoveResult.error}`);
       }
     }
     
@@ -100,7 +107,7 @@ async function restartTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?
     console.log('Starting tunnel components...');
     
     if (tunnel.type === 'iran') {
-      // Iran server setup
+      // Iran server setup (CLIENT SIDE)
       // 1. Create VXLAN interface
       const vxlanResult = await createVXLANInterface({
         vni: tunnel.vni,
@@ -114,19 +121,18 @@ async function restartTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?
         return { success: false, error: `VXLAN setup failed: ${vxlanResult.error}` };
       }
       
-      // 2. Start Xray SOCKS5 server
-      const xrayResult = await startXray({
-        socksPort: tunnel.socks_port,
-        vxlanIP: tunnel.iran_vxlan_ip,
-        serverType: 'iran'
+      // 2. Setup client-side routing to foreign server
+      const routeResult = await setupClientRouting({
+        foreignVxlanIP: tunnel.foreign_vxlan_ip,
+        socksPort: tunnel.socks_port
       });
       
-      if (!xrayResult.success) {
-        return { success: false, error: `Xray startup failed: ${xrayResult.error}` };
+      if (!routeResult.success) {
+        return { success: false, error: `Client routing setup failed: ${routeResult.error}` };
       }
       
     } else {
-      // Foreign server setup
+      // Foreign server setup (SERVER SIDE)
       // 1. Create VXLAN interface
       const vxlanResult = await createVXLANInterface({
         vni: tunnel.vni,
@@ -140,22 +146,21 @@ async function restartTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?
         return { success: false, error: `VXLAN setup failed: ${vxlanResult.error}` };
       }
       
-      // 2. Setup NAT rules
-      const natResult = await setupNATRules(tunnel.foreign_vxlan_ip);
-      if (!natResult.success) {
-        return { success: false, error: `NAT setup failed: ${natResult.error}` };
-      }
-      
-      // 3. Start Xray SOCKS5 client
+      // 2. Start Xray SOCKS5 server on foreign server
       const xrayResult = await startXray({
         socksPort: tunnel.socks_port,
         vxlanIP: tunnel.foreign_vxlan_ip,
-        serverType: 'foreign',
-        remoteVxlanIP: tunnel.iran_vxlan_ip
+        serverType: 'foreign'
       });
       
       if (!xrayResult.success) {
         return { success: false, error: `Xray startup failed: ${xrayResult.error}` };
+      }
+      
+      // 3. Setup NAT rules for internet access
+      const natResult = await setupNATRules(tunnel.foreign_vxlan_ip);
+      if (!natResult.success) {
+        return { success: false, error: `NAT setup failed: ${natResult.error}` };
       }
     }
     

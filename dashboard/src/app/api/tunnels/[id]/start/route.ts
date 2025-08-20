@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { isLinux, isWindows } from '../../../../../utils/system';
-import { createVXLANInterface, setupNATRules } from '../../../../../utils/vxlan';
+import { createVXLANInterface, setupNATRules, setupClientRouting } from '../../../../../utils/vxlan';
 import { startXray } from '../../../../../utils/xray';
 
 interface Tunnel {
@@ -72,7 +72,7 @@ async function startTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?: 
     console.log(`Starting tunnel ${tunnel.id} (${tunnel.type})`);
     
     if (tunnel.type === 'iran') {
-      // Iran server setup
+      // Iran server setup (CLIENT SIDE)
       // 1. Create VXLAN interface
       const vxlanResult = await createVXLANInterface({
         vni: tunnel.vni,
@@ -86,19 +86,18 @@ async function startTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?: 
         return { success: false, error: `VXLAN setup failed: ${vxlanResult.error}` };
       }
       
-      // 2. Start Xray SOCKS5 server
-      const xrayResult = await startXray({
-        socksPort: tunnel.socks_port,
-        vxlanIP: tunnel.iran_vxlan_ip,
-        serverType: 'iran'
+      // 2. Setup client-side routing to foreign server
+      const routeResult = await setupClientRouting({
+        foreignVxlanIP: tunnel.foreign_vxlan_ip,
+        socksPort: tunnel.socks_port
       });
       
-      if (!xrayResult.success) {
-        return { success: false, error: `Xray startup failed: ${xrayResult.error}` };
+      if (!routeResult.success) {
+        return { success: false, error: `Client routing setup failed: ${routeResult.error}` };
       }
       
     } else {
-      // Foreign server setup
+      // Foreign server setup (SERVER SIDE)
       // 1. Create VXLAN interface
       const vxlanResult = await createVXLANInterface({
         vni: tunnel.vni,
@@ -112,7 +111,18 @@ async function startTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?: 
         return { success: false, error: `VXLAN setup failed: ${vxlanResult.error}` };
       }
       
-      // 2. Setup NAT rules
+      // 2. Start Xray SOCKS5 server on foreign server
+      const xrayResult = await startXray({
+        socksPort: tunnel.socks_port,
+        vxlanIP: tunnel.foreign_vxlan_ip,
+        serverType: 'foreign'
+      });
+      
+      if (!xrayResult.success) {
+        return { success: false, error: `Xray startup failed: ${xrayResult.error}` };
+      }
+      
+      // 3. Setup NAT rules for internet access
       const natResult = await setupNATRules(tunnel.foreign_vxlan_ip);
       if (!natResult.success) {
         return { success: false, error: `NAT setup failed: ${natResult.error}` };

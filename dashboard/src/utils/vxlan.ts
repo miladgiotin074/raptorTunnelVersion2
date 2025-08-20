@@ -66,6 +66,41 @@ export async function createVXLANInterface(config: VXLANConfig): Promise<{ succe
   }
 }
 
+// Setup client-side routing to foreign server
+export async function setupClientRouting(config: { foreignVxlanIP: string; socksPort: number }): Promise<{ success: boolean; error?: string }> {
+  if (!isLinux()) {
+    return { success: false, error: 'Client routing is only supported on Linux systems' };
+  }
+
+  const isRootUser = await isRoot();
+  if (!isRootUser) {
+    return { success: false, error: 'Root privileges required to setup client routing' };
+  }
+
+  try {
+    // Setup route to foreign SOCKS5 server through VXLAN
+    const routeCmd = `ip route add ${config.foreignVxlanIP}/32 dev $(ip route | grep 'vxlan.*scope link' | head -1 | awk '{print $3}')`;
+    const routeResult = await executeCommand(routeCmd);
+    
+    if (!routeResult.success) {
+      return { success: false, error: `Failed to setup route to foreign server: ${routeResult.error}` };
+    }
+
+    // Test connectivity to foreign SOCKS5 server
+    const testCmd = `timeout 5 nc -z ${config.foreignVxlanIP} ${config.socksPort}`;
+    const testResult = await executeCommand(testCmd);
+    
+    if (!testResult.success) {
+      console.warn(`Warning: Cannot connect to SOCKS5 server at ${config.foreignVxlanIP}:${config.socksPort}`);
+      // Don't fail here as the server might not be ready yet
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 // Delete VXLAN interface
 export async function deleteVXLANInterface(vni: number): Promise<{ success: boolean; error?: string }> {
   if (!isLinux()) {
