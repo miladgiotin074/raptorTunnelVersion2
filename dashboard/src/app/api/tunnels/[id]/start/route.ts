@@ -127,18 +127,6 @@ async function startTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?: 
       if (!natResult.success) {
         return { success: false, error: `NAT setup failed: ${natResult.error}` };
       }
-      
-      // 3. Start Xray SOCKS5 client
-      const xrayResult = await startXray({
-        socksPort: tunnel.socks_port,
-        vxlanIP: tunnel.foreign_vxlan_ip,
-        serverType: 'foreign',
-        remoteVxlanIP: tunnel.iran_vxlan_ip
-      });
-      
-      if (!xrayResult.success) {
-        return { success: false, error: `Xray startup failed: ${xrayResult.error}` };
-      }
     }
     
     return { success: true };
