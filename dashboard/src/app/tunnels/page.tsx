@@ -42,6 +42,8 @@ export default function TunnelsPage() {
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTunnel, setEditingTunnel] = useState<Tunnel | null>(null);
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [connectionCode, setConnectionCode] = useState('');
   const [operationLoading, setOperationLoading] = useState<string | null>(null);
@@ -106,9 +108,12 @@ export default function TunnelsPage() {
       setError(null);
       
       if (operation === 'edit') {
-        // For edit operation, we'll show an edit modal (to be implemented)
-        setError('Edit functionality will be implemented soon');
-        setTimeout(() => setError(null), 3000);
+        // Find the tunnel to edit
+        const tunnelToEdit = tunnels.find(t => t.id === tunnelId);
+        if (tunnelToEdit) {
+          setEditingTunnel(tunnelToEdit);
+          setShowEditModal(true);
+        }
         return;
       }
       
@@ -395,6 +400,171 @@ export default function TunnelsPage() {
           }}
         />
       )}
+
+      {showEditModal && editingTunnel && (
+        <EditTunnelModal
+          tunnel={editingTunnel}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingTunnel(null);
+          }}
+          onSuccess={(message) => {
+            setSuccess(message);
+            fetchTunnelsAuto();
+            setTimeout(() => setSuccess(null), 5000);
+          }}
+          onError={(message) => {
+            setError(message);
+            setTimeout(() => setError(null), 5000);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Edit Tunnel Modal Component
+function EditTunnelModal({ 
+  tunnel,
+  onClose, 
+  onSuccess, 
+  onError 
+}: { 
+  tunnel: Tunnel;
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+  onError: (message: string) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: tunnel.name,
+    iran_ip: tunnel.iran_ip || '',
+    foreign_ip: tunnel.foreign_ip || '',
+    vxlan_port: tunnel.vxlan_port || 4789,
+    socks_port: tunnel.socks_port || 1080,
+    vni: tunnel.vni || 0,
+    iran_vxlan_ip: tunnel.iran_vxlan_ip || '',
+    foreign_vxlan_ip: tunnel.foreign_vxlan_ip || ''
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const response = await fetch(`/api/tunnels/${tunnel.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update tunnel');
+      }
+      
+      const data = await response.json();
+      onSuccess(data.message || 'Tunnel updated successfully');
+      onClose();
+    } catch (err: any) {
+      onError(err.message || 'Failed to update tunnel');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 w-full max-w-lg mx-4 shadow-2xl">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">Edit Tunnel</h2>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 rounded-xl transition-all duration-300"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Tunnel Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400/50 transition-all duration-300"
+              placeholder="Enter tunnel name"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Iran IP</label>
+              <input
+                type="text"
+                value={formData.iran_ip}
+                onChange={(e) => setFormData({ ...formData, iran_ip: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400/50 transition-all duration-300"
+                placeholder="Iran server IP"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Foreign IP</label>
+              <input
+                type="text"
+                value={formData.foreign_ip}
+                onChange={(e) => setFormData({ ...formData, foreign_ip: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400/50 transition-all duration-300"
+                placeholder="Foreign server IP"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">VXLAN Port</label>
+              <input
+                type="number"
+                value={formData.vxlan_port}
+                onChange={(e) => setFormData({ ...formData, vxlan_port: parseInt(e.target.value) || 4789 })}
+                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400/50 transition-all duration-300"
+                placeholder="4789"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">SOCKS Port</label>
+              <input
+                type="number"
+                value={formData.socks_port}
+                onChange={(e) => setFormData({ ...formData, socks_port: parseInt(e.target.value) || 1080 })}
+                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600/50 rounded-xl text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400/50 transition-all duration-300"
+                placeholder="1080"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-4 pt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-6 py-3 bg-gray-700/50 hover:bg-gray-700/70 border border-gray-600/50 hover:border-gray-600/70 rounded-xl text-gray-300 hover:text-gray-100 transition-all duration-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-6 py-3 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 border border-yellow-400/30 hover:border-yellow-400/50 rounded-xl text-yellow-400 hover:text-yellow-300 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Updating...' : 'Update Tunnel'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -406,7 +576,7 @@ function TunnelCard({
   operationLoading 
 }: { 
   tunnel: Tunnel; 
-  onOperation: (id: string, operation: 'start' | 'stop' | 'restart' | 'delete') => void;
+  onOperation: (id: string, operation: 'start' | 'stop' | 'restart' | 'delete' | 'edit') => void;
   operationLoading: string | null;
 }) {
   const [showConnectionCode, setShowConnectionCode] = useState(false);
