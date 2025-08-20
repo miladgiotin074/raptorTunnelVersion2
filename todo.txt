@@ -3,7 +3,6 @@ dWxjkAxRuwPV
 xray 127.0.0.1
 ipinfo
 remove vxlan key
-test connectun
 over
 mobile
 errors

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RefreshCwIcon, WifiIcon, TrendingUpIcon, Users2Icon, BarChart3Icon, GlobeIcon, ClockIcon, ZapIcon, PlusIcon, PlayIcon, Square, RotateCcwIcon, TrashIcon, CopyIcon, SettingsIcon, ServerIcon, EditIcon, CheckCircleIcon } from 'lucide-react';
+import { RefreshCwIcon, WifiIcon, TrendingUpIcon, Users2Icon, BarChart3Icon, GlobeIcon, ClockIcon, ZapIcon, PlusIcon, PlayIcon, Square, RotateCcwIcon, TrashIcon, CopyIcon, SettingsIcon, ServerIcon, EditIcon } from 'lucide-react';
 
 interface Tunnel {
   id: string;
@@ -47,7 +47,7 @@ export default function TunnelsPage() {
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [connectionCode, setConnectionCode] = useState('');
   const [operationLoading, setOperationLoading] = useState<string | null>(null);
-  const [testingConnection, setTestingConnection] = useState<string | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -143,42 +143,7 @@ export default function TunnelsPage() {
     }
   }
 
-  // Test connection function
-  const testConnection = async (tunnelId: string) => {
-    setTestingConnection(tunnelId);
-    setError(null);
-    setSuccess(null);
 
-    try {
-      const response = await fetch(`/api/tunnels/${tunnelId}/test`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to test connection');
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        setSuccess('Connection test successful! Tunnel is working properly.');
-      } else {
-        setError(data.message || 'Connection test failed');
-      }
-
-      setTimeout(() => {
-        setSuccess(null);
-        setError(null);
-      }, 5000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to test connection');
-      setTimeout(() => setError(null), 5000);
-    } finally {
-      setTestingConnection(null);
-    }
-  };
 
   // Calculate stats
   const totalConnections = tunnels.reduce((sum, tunnel) => sum + tunnel.connection_count, 0);
@@ -406,8 +371,6 @@ export default function TunnelsPage() {
                   tunnel={tunnel} 
                   onOperation={handleTunnelOperation}
                   operationLoading={operationLoading}
-                  testingConnection={testingConnection}
-                  testConnection={testConnection}
                 />
               ))}
             </div>
@@ -613,15 +576,11 @@ function EditTunnelModal({
 function TunnelCard({ 
   tunnel, 
   onOperation, 
-  operationLoading,
-  testingConnection,
-  testConnection
+  operationLoading
 }: { 
   tunnel: Tunnel; 
   onOperation: (id: string, operation: 'start' | 'stop' | 'restart' | 'delete' | 'edit') => void;
   operationLoading: string | null;
-  testingConnection: string | null;
-  testConnection: (tunnelId: string) => void;
 }) {
   const [showConnectionCode, setShowConnectionCode] = useState(false);
   
@@ -715,20 +674,7 @@ function TunnelCard({
             </button>
           )}
           
-          {tunnel.type === 'iran' && (
-            <button 
-              onClick={() => testConnection(tunnel.id)}
-              disabled={testingConnection === tunnel.id}
-              className="p-2 text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-400/30 border border-transparent rounded-xl transition-all duration-300 disabled:opacity-50 hover:scale-110 active:scale-95 group/test"
-              title="Test Connection"
-            >
-              {testingConnection === tunnel.id ? (
-                <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <CheckCircleIcon className="w-4 h-4 group-hover/test:scale-125 transition-transform duration-300" />
-              )}
-            </button>
-          )}
+
           
           {tunnel.status === 'inactive' ? (
             <button 
