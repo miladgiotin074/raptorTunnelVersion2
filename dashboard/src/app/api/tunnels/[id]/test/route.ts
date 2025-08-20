@@ -35,76 +35,37 @@ export async function POST(
       );
     }
     
-    // Test SOCKS5 connection using localhost (same as curl command)
-    // This tests the actual SOCKS5 proxy that's running on the Iran server
-    const socksProxy = `socks5://127.0.0.1:${tunnel.socks_port}`;
+    // Test SOCKS5 connection
+    const socksProxy = `socks5://${tunnel.iran_ip}:${tunnel.socks_port}`;
     const agent = new SocksProxyAgent(socksProxy);
-    
-    const startTime = Date.now();
     
     try {
       // Test connection by making a request through the SOCKS5 proxy
-      // Using the same endpoint as the user's curl command
-      const testResponse = await fetch('http://api.ipify.org?format=json', {
+      // Using a reliable test endpoint
+      const testResponse = await fetch('http://httpbin.org/ip', {
         agent,
-        timeout: 15000, // 15 second timeout
+        timeout: 10000, // 10 second timeout
       });
-      
-      const responseTime = Date.now() - startTime;
       
       if (testResponse.ok) {
         const data = await testResponse.json();
-        
-        // Verify that the response comes from foreign server IP
-        const isFromForeignServer = data.ip === tunnel.foreign_ip;
-        
         return NextResponse.json({
           success: true,
-          message: isFromForeignServer 
-            ? 'SOCKS5 connection test successful - traffic routing through foreign server' 
-            : 'SOCKS5 connection successful but may not be routing through expected foreign server',
+          message: 'Connection test successful',
           details: {
-            proxy_ip: data.ip,
-            expected_foreign_ip: tunnel.foreign_ip,
-            routing_correct: isFromForeignServer,
-            response_time_ms: responseTime,
-            tested_via: `127.0.0.1:${tunnel.socks_port}`
+            proxy_ip: data.origin,
+            response_time: Date.now()
           }
         });
       } else {
-        throw new Error(`HTTP ${testResponse.status}: ${testResponse.statusText}`);
+        throw new Error(`HTTP ${testResponse.status}`);
       }
     } catch (proxyError: any) {
-      const responseTime = Date.now() - startTime;
-      
-      // Provide more detailed error information
-       let errorMessage = 'SOCKS5 connection failed';
-       let errorDetails = proxyError.message;
-       
-       if (proxyError.code === 'ECONNREFUSED') {
-         errorMessage = 'SOCKS5 proxy not accessible - check if proxy is running on the specified port';
-       } else if (proxyError.code === 'ETIMEDOUT') {
-         errorMessage = 'Connection timeout - proxy may be down or network issues';
-       } else if (proxyError.code === 'ENOTFOUND') {
-         errorMessage = 'Cannot resolve target - check network configuration';
-       }
-       
-       return NextResponse.json({
-         success: false,
-         message: errorMessage,
-         error_type: 'socks_proxy_error',
-         details: {
-           error_code: proxyError.code,
-           error_details: errorDetails,
-           response_time_ms: responseTime,
-           tested_via: `127.0.0.1:${tunnel.socks_port}`,
-           troubleshooting: {
-             check_proxy: 'Verify SOCKS5 proxy is running on the Iran server',
-             check_port: `Ensure port ${tunnel.socks_port} is open and accessible`,
-             check_tunnel: 'Verify tunnel connection between Iran and foreign servers'
-           }
-         }
-       });
+      return NextResponse.json({
+        success: false,
+        message: `SOCKS5 connection failed: ${proxyError.message}`,
+        error_type: 'proxy_error'
+      });
     }
     
   } catch (error: any) {
