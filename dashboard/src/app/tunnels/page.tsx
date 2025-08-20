@@ -53,28 +53,49 @@ export default function TunnelsPage() {
     setLastUpdate(new Date());
   }, []);
 
-  // Fetch tunnels from API
-  const fetchTunnels = async () => {
+  // Function for automatic refresh (without loading state)
+  const fetchTunnelsAuto = async () => {
     try {
-      setLoading(true);
+      setError(null);
       const response = await fetch('/api/tunnels');
       if (!response.ok) throw new Error('Failed to fetch tunnels');
       const data = await response.json();
       setTunnels(data.tunnels || []);
       setLastUpdate(new Date());
+    } catch (err) {
+      setError('Failed to load tunnels');
+      console.error('Error fetching tunnels:', err);
+    }
+  };
+
+  // Function for manual refresh (with loading state)
+  const fetchTunnelsManual = async (isInitial = false) => {
+    try {
+      if (isInitial || !tunnels.length) {
+        setLoading(true);
+      }
       setError(null);
+      const response = await fetch('/api/tunnels');
+      if (!response.ok) throw new Error('Failed to fetch tunnels');
+      const data = await response.json();
+      setTunnels(data.tunnels || []);
+      setLastUpdate(new Date());
     } catch (err) {
       setError('Failed to load tunnels');
       console.error('Error fetching tunnels:', err);
     } finally {
-      setLoading(false);
+      if (isInitial || !tunnels.length) {
+        setLoading(false);
+      }
     }
   };
 
   // Auto-refresh every 3 seconds
   useEffect(() => {
-    fetchTunnels();
-    const interval = setInterval(fetchTunnels, 3000);
+    // Initial load with loading state
+    fetchTunnelsManual(true);
+    // Auto refresh every 3 seconds without loading state
+    const interval = setInterval(fetchTunnelsAuto, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -105,7 +126,7 @@ export default function TunnelsPage() {
       setSuccess(data.message || `Tunnel ${operation}ed successfully`);
       
       // Refresh tunnels list
-      await fetchTunnels();
+      await fetchTunnelsAuto();
       
       setTimeout(() => setSuccess(null), 5000);
     } catch (err: any) {
@@ -123,15 +144,41 @@ export default function TunnelsPage() {
   const foreignTunnels = tunnels.filter(tunnel => tunnel.type === 'foreign').length;
 
   const handleRefresh = () => {
-    fetchTunnels();
+    fetchTunnelsManual();
   };
+
+  // Show loading screen for initial load
+  if (loading && tunnels.length === 0) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100 flex items-center justify-center relative overflow-hidden">
+        {/* Background animated elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+        </div>
+        
+        <div className="text-center relative z-10">
+          {/* Enhanced loading spinner with icon */}
+          <div className="relative mb-8 inline-block">
+            {/* Outer spinning ring only */}
+            <div className="animate-spin rounded-full h-20 w-20 border-4 border-transparent border-t-blue-400 border-r-indigo-400" style={{animationDuration: '1s'}}></div>
+            
+            {/* Center icon */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <WifiIcon className="h-8 w-8 text-blue-300 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text text-transparent mb-2">
             VXLAN Tunnels
           </h1>
           <p className="text-gray-400">
@@ -141,7 +188,7 @@ export default function TunnelsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 hover:from-green-500/30 hover:to-emerald-500/30 border border-green-400/30 hover:border-green-400/50 rounded-xl transition-all duration-300 group text-green-400 hover:text-green-300"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 border border-blue-400/30 hover:border-blue-400/50 rounded-xl transition-all duration-300 group text-blue-400 hover:text-blue-300"
           >
             <PlusIcon className="w-4 h-4" />
             Create Tunnel
@@ -149,7 +196,7 @@ export default function TunnelsPage() {
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500/20 to-cyan-500/20 hover:from-teal-500/30 hover:to-cyan-500/30 border border-teal-400/30 hover:border-teal-400/50 rounded-xl transition-all duration-300 group disabled:opacity-50 text-teal-400 hover:text-teal-300"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 border border-blue-400/30 hover:border-blue-400/50 rounded-xl transition-all duration-300 group disabled:opacity-50 text-blue-400 hover:text-blue-300"
           >
             <RefreshCwIcon className={`w-4 h-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180'} transition-all duration-500`} />
             {loading ? 'Loading...' : 'Refresh'}
@@ -178,12 +225,12 @@ export default function TunnelsPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Active Tunnels Card */}
-        <div className="relative bg-gradient-to-br from-teal-500/10 via-gray-800/60 to-cyan-500/10 backdrop-blur-sm border border-teal-400/20 p-6 rounded-2xl shadow-2xl hover:shadow-teal-500/20 hover:scale-[1.05] hover:border-teal-400/40 transition-all duration-500 group overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div className="relative bg-gradient-to-br from-blue-500/10 via-gray-800/60 to-blue-600/10 backdrop-blur-sm border border-blue-400/20 p-6 rounded-2xl shadow-2xl hover:shadow-blue-500/20 hover:scale-[1.05] hover:border-blue-400/40 transition-all duration-500 group overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-teal-500/30 to-cyan-500/20 rounded-xl group-hover:from-teal-500/40 group-hover:to-cyan-500/30 group-hover:scale-110 transition-all duration-300">
-                <WifiIcon className="h-7 w-7 text-teal-300 group-hover:text-teal-200" />
+              <div className="p-3 bg-gradient-to-br from-blue-500/30 to-blue-600/20 rounded-xl group-hover:from-blue-500/40 group-hover:to-blue-600/30 group-hover:scale-110 transition-all duration-300">
+                <WifiIcon className="h-7 w-7 text-blue-300 group-hover:text-blue-200" />
               </div>
               <div className="flex items-center space-x-2">
                 <TrendingUpIcon className="h-4 w-4 text-green-400 animate-pulse" />
@@ -192,36 +239,36 @@ export default function TunnelsPage() {
             </div>
             <p className="text-sm text-gray-400 mb-2 font-medium">Active Tunnels</p>
             <div className="flex items-baseline space-x-2">
-              <p className="text-4xl font-bold bg-gradient-to-r from-teal-300 to-cyan-300 bg-clip-text text-transparent">{activeTunnels}</p>
-              <span className="text-green-400 text-sm font-semibold">online</span>
+              <p className="text-4xl font-bold bg-gradient-to-r from-blue-300 to-blue-400 bg-clip-text text-transparent">{activeTunnels}</p>
+              <span className="text-blue-400 text-sm font-semibold">online</span>
             </div>
             <div className="mt-3 flex items-center text-xs text-gray-500">
-              <div className="w-2 h-2 bg-teal-400 rounded-full mr-2"></div>
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
               <span>All systems operational</span>
             </div>
           </div>
         </div>
 
         {/* Total Connections Card */}
-        <div className="relative bg-gradient-to-br from-blue-500/10 via-gray-800/60 to-indigo-500/10 backdrop-blur-sm border border-blue-400/20 p-6 rounded-2xl shadow-2xl hover:shadow-blue-500/20 hover:scale-[1.05] hover:border-blue-400/40 transition-all duration-500 group overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div className="relative bg-gradient-to-br from-green-500/10 via-gray-800/60 to-emerald-500/10 backdrop-blur-sm border border-green-400/20 p-6 rounded-2xl shadow-2xl hover:shadow-green-500/20 hover:scale-[1.05] hover:border-green-400/40 transition-all duration-500 group overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-blue-500/30 to-indigo-500/20 rounded-xl group-hover:from-blue-500/40 group-hover:to-indigo-500/30 group-hover:scale-110 transition-all duration-300">
-                <Users2Icon className="h-7 w-7 text-blue-300 group-hover:text-blue-200" />
+              <div className="p-3 bg-gradient-to-br from-green-500/30 to-emerald-500/20 rounded-xl group-hover:from-green-500/40 group-hover:to-emerald-500/30 group-hover:scale-110 transition-all duration-300">
+                <Users2Icon className="h-7 w-7 text-green-300 group-hover:text-green-200" />
               </div>
               <div className="flex items-center space-x-2">
-                <BarChart3Icon className="h-4 w-4 text-blue-400 animate-pulse" />
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                <BarChart3Icon className="h-4 w-4 text-green-400 animate-pulse" />
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               </div>
             </div>
             <p className="text-sm text-gray-400 mb-2 font-medium">Total Connections</p>
             <div className="flex items-baseline space-x-2">
-              <p className="text-4xl font-bold text-blue-300">{totalConnections}</p>
+              <p className="text-4xl font-bold text-green-300">{totalConnections}</p>
               <span className="text-gray-500 text-sm">active</span>
             </div>
             <div className="mt-3 flex items-center text-xs text-gray-500">
-              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
               <span>Real-time connections</span>
             </div>
           </div>
@@ -290,14 +337,14 @@ export default function TunnelsPage() {
           </div>
         ) : tunnels.length === 0 ? (
           <div className="text-center py-12 bg-gradient-to-br from-gray-800/60 to-gray-900/40 backdrop-blur-sm border border-gray-600/30 rounded-2xl">
-            <div className="p-4 bg-gradient-to-br from-teal-500/20 to-cyan-500/10 rounded-2xl w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-              <WifiIcon className="w-10 h-10 text-teal-400" />
+            <div className="p-4 bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-2xl w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+              <WifiIcon className="w-10 h-10 text-blue-400" />
             </div>
             <h3 className="text-lg font-medium text-gray-100 mb-2">No tunnels found</h3>
             <p className="text-gray-400 mb-6">Create your first VXLAN tunnel to get started.</p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-teal-500/20 to-cyan-500/20 hover:from-teal-500/30 hover:to-cyan-500/30 border border-teal-400/30 hover:border-teal-400/50 rounded-xl transition-all duration-300 text-teal-400 hover:text-teal-300"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 border border-blue-400/30 hover:border-blue-400/50 rounded-xl transition-all duration-300 text-blue-400 hover:text-blue-300"
             >
               <PlusIcon className="w-4 h-4" />
               Create Tunnel
@@ -305,31 +352,7 @@ export default function TunnelsPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="flex items-center justify-between px-2">
-              <div className="flex items-center gap-4">
-                <h3 className="text-lg font-semibold text-gray-200">Active Tunnels</h3>
-                <span className="px-3 py-1 bg-teal-500/20 text-teal-400 rounded-full text-sm font-medium border border-teal-400/30">
-                  {tunnels.length} {tunnels.length === 1 ? 'tunnel' : 'tunnels'}
-                </span>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <span>Sort by:</span>
-                  <select className="bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-1 text-gray-300 text-sm focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400/50">
-                    <option value="created">Date Created</option>
-                    <option value="name">Name</option>
-                    <option value="status">Status</option>
-                  </select>
-                </div>
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white rounded-xl transition-all duration-300 font-medium shadow-lg hover:shadow-teal-500/25"
-                >
-                  <PlusIcon className="w-4 h-4" />
-                  New Tunnel
-                </button>
-              </div>
-            </div>
+
             
             <div className="grid gap-6">
               {tunnels
@@ -353,7 +376,7 @@ export default function TunnelsPage() {
           onClose={() => setShowCreateModal(false)}
           onSuccess={(message) => {
             setSuccess(message);
-            fetchTunnels();
+            fetchTunnelsAuto();
             setTimeout(() => setSuccess(null), 5000);
           }}
           onError={(message) => {
@@ -427,7 +450,9 @@ function TunnelCard({
   };
   
   return (
-    <div className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 shadow-2xl hover:shadow-3xl hover:border-gray-600/50 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 group animate-fade-in-up">
+    <div className="relative bg-gradient-to-br from-gray-800/60 via-gray-900/50 to-gray-800/60 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 shadow-2xl hover:shadow-3xl hover:border-gray-600/40 hover:scale-[1.02] hover:-translate-y-1 transition-all duration-500 group animate-fade-in-up overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-700/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      <div className="relative z-10">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <div className={`p-3 rounded-xl transition-all duration-300 ${
@@ -630,6 +655,7 @@ function TunnelCard({
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

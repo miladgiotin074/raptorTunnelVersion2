@@ -1,5 +1,6 @@
 sudo ip addr add 95.217.245.60 dev eth0
 dWxjkAxRuwPV
+xray 127.0.0.1
 ipinfo
 edit
 remove vxlan key
