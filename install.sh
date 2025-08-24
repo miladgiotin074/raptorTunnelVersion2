@@ -30,6 +30,7 @@ function install_deps() {
     apt install -y curl git build-essential figlet lolcat
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     apt install -y nodejs
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 }
 
 function clone_project() {
