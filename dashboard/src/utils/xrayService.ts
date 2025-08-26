@@ -101,24 +101,14 @@ function generateSystemdService(config: XrayConfig): string {
   
   return `[Unit]
 Description=Xray Service for Tunnel ${config.tunnelId}
-After=network.target
-Wants=network.target
+After=multi-user.target
 
 [Service]
 Type=simple
 User=root
 ExecStart=/usr/local/bin/xray run -config ${configFile}
-Restart=always
-RestartSec=5
-StandardOutput=append:${logFile}
-StandardError=append:${logFile}
-SyslogIdentifier=${serviceName}
-
-# Security settings
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/log/raptor-tunnel
+Restart=on-failure
+Type=simple
 
 [Install]
 WantedBy=multi-user.target

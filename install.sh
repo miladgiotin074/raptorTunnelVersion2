@@ -46,14 +46,14 @@ function create_service() {
     echo -e "${YELLOW}[*] Creating systemd service...${RESET}"
     cat > $SERVICE_FILE <<EOF
 [Unit]
-Description=Raptor Tunnel Next.js App
-After=network.target
+Description=Raptor Tunnel Dashboard
+After=multi-user.target
 
 [Service]
 Type=simple
 WorkingDirectory=$DASHBOARD_DIR
 ExecStart=/usr/bin/npm start
-Restart=always
+Restart=on-failure
 User=root
 Environment=PORT=3000
 
