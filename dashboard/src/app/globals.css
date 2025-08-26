@@ -30,3 +30,29 @@ h1, h2, h3 {
   line-height: 1.2;
   overflow: visible;
 }
+
+/* Mobile responsive improvements */
+@media (max-width: 768px) {
+  /* Ensure mobile viewport is properly handled */
+  html {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+  
+  /* Improve touch targets on mobile */
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent horizontal scroll on mobile */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Optimize text rendering on mobile */
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
