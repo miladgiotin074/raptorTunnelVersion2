@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { isLinux, isWindows, executeCommand } from '../../../../../utils/system';
 import { createVXLANInterface, setupNATRules, deleteVXLANInterface, removeNATRules, setupClientRouting } from '../../../../../utils/vxlan';
-import { startXray, stopXray } from '../../../../../utils/xray';
+import { createXrayService, startXrayService, stopXrayService, removeXrayService } from '../../../../../utils/xrayService';
 
 interface Tunnel {
   id: string;
@@ -73,10 +73,16 @@ async function restartTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?
     // Step 1: Stop existing tunnel components
     console.log('Stopping existing tunnel components...');
     
-    // Stop Xray process
-    const xrayStopResult = await stopXray(tunnel.socks_port);
+    // Stop Xray service
+    const xrayStopResult = await stopXrayService(tunnel.id);
     if (!xrayStopResult.success) {
-      console.warn(`Failed to stop Xray: ${xrayStopResult.error}`);
+      console.warn(`Failed to stop Xray service: ${xrayStopResult.error}`);
+    }
+    
+    // Remove Xray service
+    const xrayRemoveResult = await removeXrayService(tunnel.id);
+    if (!xrayRemoveResult.success) {
+      console.warn(`Failed to remove Xray service: ${xrayRemoveResult.error}`);
     }
     
     // Remove NAT rules (for foreign servers) or client routes (for iran servers)
@@ -121,16 +127,22 @@ async function restartTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?
         return { success: false, error: `VXLAN setup failed: ${vxlanResult.error}` };
       }
       
-      // 2. Start Xray SOCKS5 server on Iran server (proxy to foreign server)
-      const xrayResult = await startXray({
+      // 2. Create and start Xray service for Iran server (proxy to foreign server)
+      const createServiceResult = await createXrayService({
         socksPort: tunnel.socks_port,
         vxlanIP: tunnel.iran_vxlan_ip,
         serverType: 'iran',
-        remoteVxlanIP: tunnel.foreign_vxlan_ip
+        remoteVxlanIP: tunnel.foreign_vxlan_ip,
+        tunnelId: tunnel.id
       });
       
-      if (!xrayResult.success) {
-        return { success: false, error: `Xray startup failed: ${xrayResult.error}` };
+      if (!createServiceResult.success) {
+        return { success: false, error: `Xray service creation failed: ${createServiceResult.error}` };
+      }
+      
+      const startServiceResult = await startXrayService(tunnel.id);
+      if (!startServiceResult.success) {
+        return { success: false, error: `Xray service startup failed: ${startServiceResult.error}` };
       }
       
       // 3. Setup client-side routing to foreign server
@@ -158,15 +170,21 @@ async function restartTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?
         return { success: false, error: `VXLAN setup failed: ${vxlanResult.error}` };
       }
       
-      // 2. Start Xray SOCKS5 server on foreign server
-      const xrayResult = await startXray({
+      // 2. Create and start Xray service for foreign server
+      const createServiceResult = await createXrayService({
         socksPort: tunnel.socks_port,
         vxlanIP: tunnel.foreign_vxlan_ip,
-        serverType: 'foreign'
+        serverType: 'foreign',
+        tunnelId: tunnel.id
       });
       
-      if (!xrayResult.success) {
-        return { success: false, error: `Xray startup failed: ${xrayResult.error}` };
+      if (!createServiceResult.success) {
+        return { success: false, error: `Xray service creation failed: ${createServiceResult.error}` };
+      }
+      
+      const startServiceResult = await startXrayService(tunnel.id);
+      if (!startServiceResult.success) {
+        return { success: false, error: `Xray service startup failed: ${startServiceResult.error}` };
       }
       
       // 3. Setup NAT rules for internet access

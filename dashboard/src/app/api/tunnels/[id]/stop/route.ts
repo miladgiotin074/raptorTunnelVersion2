@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { isLinux, isWindows } from '../../../../../utils/system';
 import { deleteVXLANInterface, removeNATRules } from '../../../../../utils/vxlan';
-import { stopXray } from '../../../../../utils/xray';
+import { stopXrayService, removeXrayService } from '../../../../../utils/xrayService';
 
 interface Tunnel {
   id: string;
@@ -70,10 +70,10 @@ async function stopTunnel(tunnel: Tunnel): Promise<{ success: boolean; error?: s
   try {
     console.log(`Stopping tunnel ${tunnel.id} (${tunnel.type})`);
     
-    // 1. Stop Xray process
-    const xrayResult = await stopXray(tunnel.socks_port);
+    // 1. Stop Xray service
+    const xrayResult = await stopXrayService(tunnel.id);
     if (!xrayResult.success) {
-      console.warn(`Failed to stop Xray: ${xrayResult.error}`);
+      console.warn(`Failed to stop Xray service: ${xrayResult.error}`);
       // Continue with cleanup even if Xray stop fails
     }
     

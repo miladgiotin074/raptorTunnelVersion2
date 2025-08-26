@@ -28,9 +28,9 @@ function update_system() {
 function install_deps() {
     echo -e "${YELLOW}[*] Installing dependencies...${RESET}"
     apt install -y curl git build-essential figlet lolcat
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     apt install -y nodejs
-    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 }
 
 function clone_project() {

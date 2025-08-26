@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { removeXrayService, stopXrayService } from '../../../utils/xrayService';
 
 interface Tunnel {
   id: string;
@@ -374,6 +375,17 @@ export async function DELETE(request: NextRequest) {
         { error: 'Tunnel not found' },
         { status: 404 }
       );
+    }
+    
+    const tunnel = data.tunnels[tunnelIndex];
+    
+    // Stop and remove Xray service if it exists
+    try {
+      await stopXrayService(id);
+      await removeXrayService(id);
+    } catch (error) {
+      console.warn(`Failed to cleanup Xray service for tunnel ${id}:`, error);
+      // Continue with tunnel deletion even if service cleanup fails
     }
     
     data.tunnels.splice(tunnelIndex, 1);
