@@ -13,9 +13,6 @@ interface XrayConfig {
 // Generate Xray configuration
 function generateXrayConfig(config: XrayConfig): any {
   const baseConfig = {
-    log: {
-      loglevel: "info"
-    },
     inbounds: [] as any[],
     outbounds: [] as any[],
     routing: {
@@ -28,11 +25,11 @@ function generateXrayConfig(config: XrayConfig): any {
     baseConfig.inbounds.push({
       tag: "socks-in",
       port: config.socksPort,
-      listen: "0.0.0.0", // Listen on all interfaces for client connections
+      listen: "127.0.0.1", // Listen on all interfaces for client connections
       protocol: "socks",
       settings: {
         auth: "noauth",
-        udp: true
+        udp: false
       }
     });
 
@@ -71,7 +68,7 @@ function generateXrayConfig(config: XrayConfig): any {
       protocol: "socks",
       settings: {
         auth: "noauth",
-        udp: true
+        udp: false
       }
     });
 
